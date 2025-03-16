@@ -10,31 +10,32 @@ import traceback
 # Try importing individual question modules with error handling
 st.set_page_config(page_title="Faculty Analysis Dashboard", layout="wide")
 
+# Change these lines in app.py:
 try:
     # Import individual question modules
     import_errors = []
     modules_available = []
     
     try:
-        import q1_current_salaries
+        from scripts import q1_current_salaries
         modules_available.append("q1")
     except Exception as e:
         import_errors.append(f"Error importing q1_current_salaries: {str(e)}")
     
     try:
-        import q2_starting_salaries
+        from scripts import q2_starting_salaries
         modules_available.append("q2")
     except Exception as e:
         import_errors.append(f"Error importing q2_starting_salaries: {str(e)}")
         
     try:
-        import q3_salary_increases
+        from scripts import q3_salary_increases
         modules_available.append("q3")
     except Exception as e:
         import_errors.append(f"Error importing q3_salary_increases: {str(e)}")
         
     try:
-        import q4_promotion_decisions
+        from scripts import q4_promotion_decisions
         modules_available.append("q4")
     except Exception as e:
         import_errors.append(f"Error importing q4_promotion_decisions: {str(e)}")
