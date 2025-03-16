@@ -55,7 +55,7 @@ def load_data(uploaded_file):
                 df['inf_salary'] = df['salary'] * df['startyr'].map(inflation_factors)
 
             except Exception as e:
-                st.warning(f"Unable to adjust for inflation: {str(e)}. Using raw salary values.")
+                # st.warning(f"Unable to adjust for inflation: {str(e)}. Using raw salary values.")
                 df['inf_salary'] = df['salary']
                 
             # Center startyr (for regression to reduce collinearity)
