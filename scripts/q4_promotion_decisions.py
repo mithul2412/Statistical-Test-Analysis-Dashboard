@@ -8,6 +8,7 @@ from scipy.stats import chi2_contingency
 import statsmodels.formula.api as smf
 from lifelines import KaplanMeierFitter
 from scipy import stats
+from patsy import dmatrices
 
 # Define palette for consistent colors
 custom_palette = {'M': 'skyblue', 'F': 'lightcoral'}
@@ -103,7 +104,7 @@ def load_data(uploaded_file, exclude_after=1990):
 
 def exploratory_analysis(df):
     """Perform exploratory analysis with visualizations"""
-    st.subheader("Exploratory Analysis")
+    # st.subheader("Exploratory Analysis")
     
     try:
         # Basic summary stats
@@ -131,7 +132,7 @@ def exploratory_analysis(df):
             st.error("Missing required columns for summary statistics.")
         
         # Create data visualizations
-        st.write("### Promotion Data Visualizations")
+        st.write("### Visualizations")
         
         # Create two columns for the first row of charts
         col1, col2 = st.columns(2)
@@ -203,6 +204,70 @@ def exploratory_analysis(df):
                 st.warning("Not enough data to compare time to promotion between genders.")
         else:
             st.warning("No promoted faculty found to analyze time to promotion.")
+            
+        # 5. Survival Analysis (Kaplan-Meier) - only if we have enough data
+        if 'years_as_assoc' in df.columns and df['promoted'].sum() > 0:
+            st.write("### Kaplan-Meier Survival Analysis")
+            st.write("This shows the probability of remaining an Associate Professor over time:")
+            
+            try:
+                # Prepare data for survival analysis
+                df['years_as_assoc'] = pd.to_numeric(df['years_as_assoc'], errors='coerce')
+                df['promoted'] = pd.to_numeric(df['promoted'], errors='coerce')
+                
+                # Drop missing values
+                df_survival = df.dropna(subset=['years_as_assoc', 'promoted'])
+                
+                if df_survival['promoted'].sum() == 0:
+                    st.warning("No faculty members were promoted in this dataset. Cannot perform survival analysis.")
+                else:
+                    # Split dataset by gender
+                    male_group = df_survival[df_survival['sex'] == 'M']
+                    female_group = df_survival[df_survival['sex'] == 'F']
+                    
+                    if male_group.empty or female_group.empty:
+                        st.warning("Missing data for one or both gender groups. Cannot perform survival analysis.")
+                    else:
+                        # Check if we have promotions in both groups
+                        if male_group['promoted'].sum() == 0 or female_group['promoted'].sum() == 0:
+                            st.warning("No promotions for one gender group. Cannot compare survival curves.")
+                        else:
+                            # Fit Kaplan-Meier models
+                            kmf_male = KaplanMeierFitter()
+                            kmf_female = KaplanMeierFitter()
+                            
+                            kmf_male.fit(male_group['years_as_assoc'], event_observed=male_group['promoted'], label="Male")
+                            kmf_female.fit(female_group['years_as_assoc'], event_observed=female_group['promoted'], label="Female")
+                            
+                            # Plot Survival Curve - smaller and centered
+                            col1, col2, col3 = st.columns([1, 2, 1])
+                            
+                            with col2:  # Center column
+                                fig5, ax5 = plt.subplots(figsize=(7, 5))
+                                kmf_male.plot(ax=ax5)
+                                kmf_female.plot(ax=ax5)
+                                ax5.set_xlabel('Years as Associate Professor')
+                                ax5.set_ylabel('Probability of Remaining Associate')
+                                ax5.set_title('Kaplan-Meier Survival Curve: Time to Promotion')
+                                ax5.legend()
+                                ax5.grid(True)
+                                st.pyplot(fig5)
+                            
+                            # Add interpretation
+                            st.write("""
+                            **How to interpret this plot:**
+                            - The y-axis shows the probability of remaining an Associate Professor
+                            - The x-axis shows years spent as Associate Professor
+                            - A steeper decline indicates faster promotion rates
+                            - Separate lines for men and women allow comparison of promotion patterns by gender
+                            """)
+            except Exception as e:
+                st.error(f"Error performing survival analysis: {str(e)}")
+        else:
+            st.info("Survival analysis requires years as Associate Professor data and at least some promotions.")
+    except Exception as e:
+        st.error(f"Error in exploratory analysis: {str(e)}")
+        st.exception(e)
         
         # 5. Survival Analysis (Kaplan-Meier) - only if we have enough data
         if 'years_as_assoc' in df.columns and df['promoted'].sum() > 0:
@@ -301,7 +366,7 @@ def statistical_tests(df):
         # Create a DataFrame for clean display
         chi_results = pd.DataFrame({
             'Statistic': ['Chi-Square Value', 'P-value', 'Degrees of Freedom'],
-            'Value': [f"{chi2:.4f}", f"{p:.4f}", f"{dof}"]
+            'Value': [f"{chi2:.4f}", f"{p}", f"{dof}"]
         })
         
         st.dataframe(chi_results)
@@ -365,7 +430,7 @@ def statistical_tests(df):
                     'Statistic': ['T-value', 'P-value', 'Mean time for men', 'Mean time for women', 'Difference in means'],
                     'Value': [
                         f"{t_stat:.4f}",
-                        f"{p_val:.4f}",
+                        f"{p_val}",
                         f"{male_mean:.2f} years",
                         f"{female_mean:.2f} years",
                         f"{male_mean - female_mean:.2f} years"
@@ -377,11 +442,11 @@ def statistical_tests(df):
                 # Interpretation
                 if p_val < 0.05:
                     if male_mean < female_mean:
-                        st.write(f"**Interpretation**: There is a statistically significant difference in time to promotion. Women take {female_mean - male_mean:.2f} years longer than men on average to be promoted from Associate to Full Professor (p={p_val:.4f}).")
+                        st.write(f"**Interpretation**: There is a statistically significant difference in time to promotion. Women take {female_mean - male_mean:.2f} years longer than men on average to be promoted from Associate to Full Professor (p={p_val}).")
                     else:
-                        st.write(f"**Interpretation**: There is a statistically significant difference in time to promotion. Men take {male_mean - female_mean:.2f} years longer than women on average to be promoted from Associate to Full Professor (p={p_val:.4f}).")
+                        st.write(f"**Interpretation**: There is a statistically significant difference in time to promotion. Men take {male_mean - female_mean:.2f} years longer than women on average to be promoted from Associate to Full Professor (p={p_val}).")
                 else:
-                    st.write(f"**Interpretation**: There is no statistically significant difference in time to promotion between men ({male_mean:.2f} years) and women ({female_mean:.2f} years), p={p_val:.4f}.")
+                    st.write(f"**Interpretation**: There is no statistically significant difference in time to promotion between men ({male_mean:.2f} years) and women ({female_mean:.2f} years), p={p_val}.")
     
     except Exception as e:
         st.error(f"Error performing t-test on promotion time: {str(e)}")
@@ -433,7 +498,7 @@ def statistical_tests(df):
             # Create a DataFrame for clean display
             model1_results = pd.DataFrame({
                 'Statistic': ['Gender Coefficient', 'P-value', 'Odds Ratio'],
-                'Value': [f"{coef:.4f}", f"{p_val:.4f}", f"{odds_ratio:.4f}"]
+                'Value': [f"{coef:.4f}", f"{p_val}", f"{odds_ratio:.4f}"]
             })
             
             st.dataframe(model1_results)
@@ -441,11 +506,11 @@ def statistical_tests(df):
             # Interpretation
             if p_val < 0.05:
                 if coef > 0:
-                    st.write(f"**Interpretation**: Men are {odds_ratio:.2f} times more likely to be promoted than women (p={p_val:.4f}).")
+                    st.write(f"**Interpretation**: Men are {odds_ratio:.2f} times more likely to be promoted than women (p={p_val}).")
                 else:
-                    st.write(f"**Interpretation**: Women are {1/odds_ratio:.2f} times more likely to be promoted than men (p={p_val:.4f}).")
+                    st.write(f"**Interpretation**: Women are {1/odds_ratio:.2f} times more likely to be promoted than men (p={p_val}).")
             else:
-                st.write(f"**Interpretation**: No significant difference in promotion likelihood between men and women (p={p_val:.4f}).")
+                st.write(f"**Interpretation**: No significant difference in promotion likelihood between men and women (p={p_val}).")
             
             # Model information in structured format
             model_info = pd.DataFrame({
@@ -454,7 +519,7 @@ def statistical_tests(df):
                     'promoted (0/1)',
                     f"{model1.prsquared:.4f}",
                     f"{model1.llf:.4f}",
-                    f"{model1.llr_pvalue:.4f}",
+                    f"{model1.llr_pvalue}",
                     f"{model1.aic:.4f}",
                     f"{model1.bic:.4f}",
                     f"{model1.nobs}"
@@ -470,7 +535,7 @@ def statistical_tests(df):
                 'Coefficient': [f"{model1.params['const']:.4f}", f"{model1.params['sex_numeric']:.4f}"],
                 'Std Error': [f"{model1.bse['const']:.4f}", f"{model1.bse['sex_numeric']:.4f}"],
                 'Z-value': [f"{model1.tvalues['const']:.4f}", f"{model1.tvalues['sex_numeric']:.4f}"],
-                'P-value': [f"{model1.pvalues['const']:.4f}", f"{model1.pvalues['sex_numeric']:.4f}"],
+                'P-value': [f"{model1.pvalues['const']}", f"{model1.pvalues['sex_numeric']}"],
                 'Odds Ratio': [f"{np.exp(model1.params['const']):.4f}", f"{np.exp(model1.params['sex_numeric']):.4f}"]
             })
             
@@ -502,7 +567,7 @@ def statistical_tests(df):
                     model2_results = pd.DataFrame({
                         'Variable': ['Gender (Male=1)', 'Years as Associate'],
                         'Coefficient': [f"{model2.params['sex_numeric']:.4f}", f"{model2.params['years_as_assoc']:.4f}"],
-                        'P-value': [f"{model2.pvalues['sex_numeric']:.4f}", f"{model2.pvalues['years_as_assoc']:.4f}"],
+                        'P-value': [f"{model2.pvalues['sex_numeric']}", f"{model2.pvalues['years_as_assoc']}"],
                         'Odds Ratio': [f"{np.exp(model2.params['sex_numeric']):.4f}", f"{np.exp(model2.params['years_as_assoc']):.4f}"]
                     })
                     
@@ -513,18 +578,18 @@ def statistical_tests(df):
                     
                     if model2.pvalues['sex_numeric'] < 0.05:
                         if model2.params['sex_numeric'] > 0:
-                            interpretations.append(f"After controlling for time spent as Associate, men are {np.exp(model2.params['sex_numeric']):.2f} times more likely to be promoted than women (p={model2.pvalues['sex_numeric']:.4f}).")
+                            interpretations.append(f"After controlling for time spent as Associate, men are {np.exp(model2.params['sex_numeric']):.2f} times more likely to be promoted than women (p={model2.pvalues['sex_numeric']}).")
                         else:
-                            interpretations.append(f"After controlling for time spent as Associate, women are {1/np.exp(model2.params['sex_numeric']):.2f} times more likely to be promoted than men (p={model2.pvalues['sex_numeric']:.4f}).")
+                            interpretations.append(f"After controlling for time spent as Associate, women are {1/np.exp(model2.params['sex_numeric']):.2f} times more likely to be promoted than men (p={model2.pvalues['sex_numeric']}).")
                     else:
-                        interpretations.append(f"After controlling for time spent as Associate, there is no significant difference in promotion likelihood between men and women (p={model2.pvalues['sex_numeric']:.4f}).")
+                        interpretations.append(f"After controlling for time spent as Associate, there is no significant difference in promotion likelihood between men and women (p={model2.pvalues['sex_numeric']}).")
                     
                     if model2.pvalues['years_as_assoc'] < 0.05:
                         years_odds = np.exp(model2.params['years_as_assoc'])
                         if model2.params['years_as_assoc'] > 0:
-                            interpretations.append(f"Each additional year spent as Associate Professor increases promotion likelihood by {(years_odds-1)*100:.1f}% (p={model2.pvalues['years_as_assoc']:.4f}).")
+                            interpretations.append(f"Each additional year spent as Associate Professor increases promotion likelihood by {(years_odds-1)*100:.1f}% (p={model2.pvalues['years_as_assoc']}).")
                         else:
-                            interpretations.append(f"Each additional year spent as Associate Professor decreases promotion likelihood by {(1-years_odds)*100:.1f}% (p={model2.pvalues['years_as_assoc']:.4f}).")
+                            interpretations.append(f"Each additional year spent as Associate Professor decreases promotion likelihood by {(1-years_odds)*100:.1f}% (p={model2.pvalues['years_as_assoc']}).")
                     
                     st.write("**Interpretations:**")
                     for interp in interpretations:
@@ -537,7 +602,7 @@ def statistical_tests(df):
                             'promoted (0/1)',
                             f"{model2.prsquared:.4f}",
                             f"{model2.llf:.4f}",
-                            f"{model2.llr_pvalue:.4f}",
+                            f"{model2.llr_pvalue}",
                             f"{model2.aic:.4f}",
                             f"{model2.bic:.4f}",
                             f"{model2.nobs}"
@@ -566,9 +631,9 @@ def statistical_tests(df):
                             f"{model2.tvalues['years_as_assoc']:.4f}"
                         ],
                         'P-value': [
-                            f"{model2.pvalues['const']:.4f}", 
-                            f"{model2.pvalues['sex_numeric']:.4f}", 
-                            f"{model2.pvalues['years_as_assoc']:.4f}"
+                            f"{model2.pvalues['const']}", 
+                            f"{model2.pvalues['sex_numeric']}", 
+                            f"{model2.pvalues['years_as_assoc']}"
                         ],
                         'Odds Ratio': [
                             f"{np.exp(model2.params['const']):.4f}", 
@@ -587,15 +652,23 @@ def statistical_tests(df):
                 st.error(f"Error running Model 2: {str(e)}")
                 model2 = None
         
-        # Full model if we have enough variables
-        full_model_vars = ['sex_numeric', 'years_as_assoc', 'age_at_promotion', 'experience', 
-                         'field_numeric', 'deg_numeric', 'admin']
-        available_vars = [var for var in full_model_vars if var in df_model.columns]
-        
-        if len(available_vars) > 2:  # At least a few predictors
-            st.write("#### Model 3: Full Model with Controls")
-            try:
-                X3 = df_model[available_vars].dropna()
+        # Interaction Model: Sex × Administrative Role (from q4_stats(1).py)
+        st.write("#### Model 3: Sex × Admin Interaction")
+        try:
+            # Ensure we have admin column
+            if 'admin' not in df_model.columns:
+                st.warning("Administrative duties column ('admin') not found. Cannot run interaction model.")
+            else:
+                # Convert admin to numeric if needed
+                df_model['admin'] = pd.to_numeric(df_model['admin'], errors='coerce')
+                
+                # Create interaction term
+                df_model['sex_admin'] = df_model['sex_numeric'] * df_model['admin']
+                
+                # Define features for interaction model
+                model3_features = ['sex_numeric', 'admin', 'sex_admin']
+                X3 = df_model[model3_features].dropna()
+                
                 if len(X3) < 10:
                     st.warning("Not enough data for Model 3 after removing missing values.")
                 else:
@@ -604,39 +677,74 @@ def statistical_tests(df):
                     
                     model3 = sm.Logit(y3, X3).fit(disp=0)
                     
-                    # Extract key results for gender
-                    if 'sex_numeric' in model3.params.index:
-                        coef = model3.params['sex_numeric']
-                        p_val = model3.pvalues['sex_numeric']
-                        odds_ratio = np.exp(coef)
-                        
-                        # Create a DataFrame for gender effect
-                        model3_gender = pd.DataFrame({
-                            'Statistic': ['Gender Coefficient (adjusted)', 'P-value', 'Odds Ratio'],
-                            'Value': [f"{coef:.4f}", f"{p_val:.4f}", f"{odds_ratio:.4f}"]
-                        })
-                        
-                        st.dataframe(model3_gender)
-                        
-                        # Interpretation for gender
-                        if p_val < 0.05:
-                            if coef > 0:
-                                st.write(f"**Interpretation**: After controlling for all factors, men are {odds_ratio:.2f} times more likely to be promoted than women (p={p_val:.4f}).")
-                            else:
-                                st.write(f"**Interpretation**: After controlling for all factors, women are {1/odds_ratio:.2f} times more likely to be promoted than men (p={p_val:.4f}).")
-                        else:
-                            st.write(f"**Interpretation**: After controlling for all factors, no significant difference in promotion likelihood between men and women (p={p_val:.4f}).")
-                    else:
-                        st.warning("Sex variable not included in final model.")
+                    # Extract key results
+                    # Create a DataFrame for coefficients
+                    model3_results = pd.DataFrame({
+                        'Variable': ['Gender (Male=1)', 'Admin Duties', 'Gender × Admin Interaction'],
+                        'Coefficient': [
+                            f"{model3.params['sex_numeric']:.4f}", 
+                            f"{model3.params['admin']:.4f}",
+                            f"{model3.params['sex_admin']:.4f}"
+                        ],
+                        'P-value': [
+                            f"{model3.pvalues['sex_numeric']}", 
+                            f"{model3.pvalues['admin']}",
+                            f"{model3.pvalues['sex_admin']}"
+                        ],
+                        'Odds Ratio': [
+                            f"{np.exp(model3.params['sex_numeric']):.4f}", 
+                            f"{np.exp(model3.params['admin']):.4f}",
+                            f"{np.exp(model3.params['sex_admin']):.4f}"
+                        ]
+                    })
                     
-                    # Model statistics
+                    st.dataframe(model3_results)
+                    
+                    # Interpretation
+                    st.write("**Interpretations:**")
+                    
+                    # Gender effect
+                    if model3.pvalues['sex_numeric'] < 0.05:
+                        if model3.params['sex_numeric'] > 0:
+                            st.write(f"- For faculty without administrative duties, men are {np.exp(model3.params['sex_numeric']):.2f} times more likely to be promoted than women (p={model3.pvalues['sex_numeric']}).")
+                        else:
+                            st.write(f"- For faculty without administrative duties, women are {1/np.exp(model3.params['sex_numeric']):.2f} times more likely to be promoted than men (p={model3.pvalues['sex_numeric']}).")
+                    else:
+                        st.write(f"- For faculty without administrative duties, there is no significant difference in promotion likelihood between men and women (p={model3.pvalues['sex_numeric']}).")
+                    
+                    # Admin effect
+                    if model3.pvalues['admin'] < 0.05:
+                        if model3.params['admin'] > 0:
+                            st.write(f"- For women, having administrative duties increases promotion likelihood by {(np.exp(model3.params['admin'])-1)*100:.1f}% (p={model3.pvalues['admin']}).")
+                        else:
+                            st.write(f"- For women, having administrative duties decreases promotion likelihood by {(1-np.exp(model3.params['admin']))*100:.1f}% (p={model3.pvalues['admin']}).")
+                    else:
+                        st.write(f"- For women, administrative duties do not significantly affect promotion likelihood (p={model3.pvalues['admin']}).")
+                    
+                    # Interaction effect
+                    if model3.pvalues['sex_admin'] < 0.05:
+                        if model3.params['sex_admin'] > 0:
+                            st.write(f"- The effect of administrative duties is significantly stronger for men than for women (p={model3.pvalues['sex_admin']}).")
+                        else:
+                            st.write(f"- The effect of administrative duties is significantly stronger for women than for men (p={model3.pvalues['sex_admin']}).")
+                        
+                        # Calculate combined effect for men
+                        combined_effect = model3.params['admin'] + model3.params['sex_admin']
+                        if combined_effect > 0:
+                            st.write(f"- For men, having administrative duties increases promotion likelihood by {(np.exp(combined_effect)-1)*100:.1f}%.")
+                        else:
+                            st.write(f"- For men, having administrative duties decreases promotion likelihood by {(1-np.exp(combined_effect))*100:.1f}%.")
+                    else:
+                        st.write(f"- The effect of administrative duties does not significantly differ between men and women (p={model3.pvalues['sex_admin']}).")
+                    
+                    # Model information
                     model_info = pd.DataFrame({
                         'Metric': ['Dependent Variable', 'Pseudo R-squared', 'Log-Likelihood', 'LLR p-value', 'AIC', 'BIC', 'Observations'],
                         'Value': [
                             'promoted (0/1)',
                             f"{model3.prsquared:.4f}",
                             f"{model3.llf:.4f}",
-                            f"{model3.llr_pvalue:.4f}",
+                            f"{model3.llr_pvalue}",
                             f"{model3.aic:.4f}",
                             f"{model3.bic:.4f}",
                             f"{model3.nobs}"
@@ -646,56 +754,285 @@ def statistical_tests(df):
                     st.write("**Model Statistics:**")
                     st.dataframe(model_info)
                     
-                    # Display all significant variables in table format
-                    sig_vars = []
+                    # Coefficients table
+                    coef_table = pd.DataFrame({
+                        'Variable': ['Intercept', 'Gender (Male=1)', 'Admin Duties', 'Gender × Admin'],
+                        'Coefficient': [
+                            f"{model3.params['const']:.4f}",
+                            f"{model3.params['sex_numeric']:.4f}", 
+                            f"{model3.params['admin']:.4f}",
+                            f"{model3.params['sex_admin']:.4f}"
+                        ],
+                        'Std Error': [
+                            f"{model3.bse['const']:.4f}",
+                            f"{model3.bse['sex_numeric']:.4f}", 
+                            f"{model3.bse['admin']:.4f}",
+                            f"{model3.bse['sex_admin']:.4f}"
+                        ],
+                        'Z-value': [
+                            f"{model3.tvalues['const']:.4f}",
+                            f"{model3.tvalues['sex_numeric']:.4f}", 
+                            f"{model3.tvalues['admin']:.4f}",
+                            f"{model3.tvalues['sex_admin']:.4f}"
+                        ],
+                        'P-value': [
+                            f"{model3.pvalues['const']}",
+                            f"{model3.pvalues['sex_numeric']}", 
+                            f"{model3.pvalues['admin']}",
+                            f"{model3.pvalues['sex_admin']}"
+                        ],
+                        'Odds Ratio': [
+                            f"{np.exp(model3.params['const']):.4f}",
+                            f"{np.exp(model3.params['sex_numeric']):.4f}", 
+                            f"{np.exp(model3.params['admin']):.4f}",
+                            f"{np.exp(model3.params['sex_admin']):.4f}"
+                        ]
+                    })
                     
-                    for var in model3.params.index:
-                        if var != 'const' and model3.pvalues[var] < 0.05:
-                            coef = model3.params[var]
-                            p_val = model3.pvalues[var]
-                            odds = np.exp(coef)
-                            
-                            var_label = var
-                            if var == 'sex_numeric':
-                                var_label = 'Male (vs Female)'
-                            elif var == 'years_as_assoc':
-                                var_label = 'Years as Associate'
-                            elif var == 'age_at_promotion':
-                                var_label = 'Age at Promotion'
-                            elif var == 'experience':
-                                var_label = 'Experience at Hiring'
-                            elif var == 'field_numeric':
-                                var_label = 'Field'
-                            elif var == 'deg_numeric':
-                                var_label = 'Degree Type'
-                            elif var == 'admin':
-                                var_label = 'Administrative Duties'
-                            
-                            effect = "increases" if coef > 0 else "decreases"
-                            change_pct = (odds - 1) * 100 if coef > 0 else (1 - odds) * 100
-                            
-                            sig_vars.append({
-                                'Variable': var_label,
-                                'Coefficient': f"{coef:.4f}",
-                                'Odds Ratio': f"{odds:.4f}",
-                                'Effect': f"{effect} likelihood by {abs(change_pct):.1f}%",
-                                'P-value': f"{p_val:.4f}"
-                            })
-                    
-                    if sig_vars:
-                        st.write("**Significant Factors Affecting Promotion:**")
-                        st.dataframe(pd.DataFrame(sig_vars))
-                    else:
-                        st.write("No factors showed statistically significant effects at p < 0.05")
+                    st.write("**Coefficients:**")
+                    st.dataframe(coef_table)
                     
                     # Raw output in expander
                     with st.expander("View Raw Model 3 Output"):
                         st.text(model3.summary().as_text())
-            except Exception as e:
-                st.error(f"Error running full model: {str(e)}")
-                model3 = None
+                        # Extract and display key tables from the raw output
+                        st.write("**Extracted Tables from Raw Output:**")
+                        
+                        # Table of coefficients
+                        st.write("*Coefficients Table:*")
+                        coef_df = pd.DataFrame({
+                            'coef': model3.params,
+                            'std err': model3.bse,
+                            'z': model3.tvalues,
+                            'P>|z|': model3.pvalues,
+                            'Odds Ratio': np.exp(model3.params),
+                            '[0.025': model3.conf_int()[0],
+                            '0.975]': model3.conf_int()[1]
+                        })
+                        st.dataframe(coef_df)
+                        
+                        # Marginal effects
+                        st.write("*Marginal Effects:*")
+                        marginal_effects = pd.DataFrame({
+                            'Variable': ['Gender (Male=1)', 'Admin Duties', 'Gender × Admin'],
+                            'dy/dx': [
+                                f"{model3.params['sex_numeric']:.4f}", 
+                                f"{model3.params['admin']:.4f}",
+                                f"{model3.params['sex_admin']:.4f}"
+                            ],
+                            'Effect': [
+                                f"{(np.exp(model3.params['sex_numeric'])-1)*100:.1f}% change in odds",
+                                f"{(np.exp(model3.params['admin'])-1)*100:.1f}% change in odds",
+                                f"{(np.exp(model3.params['sex_admin'])-1)*100:.1f}% change in odds"
+                            ]
+                        })
+                        st.dataframe(marginal_effects)
+                        
+                        # Model fit statistics
+                        st.write("*Model Fit Statistics:*")
+                        fit_stats = pd.DataFrame({
+                            'Metric': ['Pseudo R-squared', 'Log-Likelihood', 'LLR p-value', 'AIC', 'BIC'],
+                            'Value': [
+                                f"{model3.prsquared:.4f}",
+                                f"{model3.llf:.4f}",
+                                f"{model3.llr_pvalue}",
+                                f"{model3.aic:.4f}",
+                                f"{model3.bic:.4f}"
+                            ]
+                        })
+                        st.dataframe(fit_stats)
+        except Exception as e:
+            st.error(f"Error running Model 3: {str(e)}")
+            
+        # Field Interaction Model
+        st.write("#### Model 4: Sex × Field Interaction")
+        try:
+            # Ensure we have field column
+            if 'field_numeric' not in df_model.columns:
+                st.warning("Academic field column ('field') not found. Cannot run field interaction model.")
+            else:
+                # Create interaction term
+                df_model['sex_field'] = df_model['sex_numeric'] * df_model['field_numeric']
+                
+                # Define features for interaction model
+                model4_features = ['sex_numeric', 'field_numeric', 'sex_field']
+                X4 = df_model[model4_features].dropna()
+                
+                if len(X4) < 10:
+                    st.warning("Not enough data for Model 4 after removing missing values.")
+                else:
+                    X4 = sm.add_constant(X4)
+                    y4 = df_model.loc[X4.index, 'promoted']
+                    
+                    model4 = sm.Logit(y4, X4).fit(disp=0)
+                    
+                    # Create a DataFrame for coefficients
+                    model4_results = pd.DataFrame({
+                        'Variable': ['Gender (Male=1)', 'Academic Field', 'Gender × Field Interaction'],
+                        'Coefficient': [
+                            f"{model4.params['sex_numeric']:.4f}", 
+                            f"{model4.params['field_numeric']:.4f}",
+                            f"{model4.params['sex_field']:.4f}"
+                        ],
+                        'P-value': [
+                            f"{model4.pvalues['sex_numeric']}", 
+                            f"{model4.pvalues['field_numeric']}",
+                            f"{model4.pvalues['sex_field']}"
+                        ],
+                        'Odds Ratio': [
+                            f"{np.exp(model4.params['sex_numeric']):.4f}", 
+                            f"{np.exp(model4.params['field_numeric']):.4f}",
+                            f"{np.exp(model4.params['sex_field']):.4f}"
+                        ]
+                    })
+                    
+                    st.dataframe(model4_results)
+                    
+                    # Interpretation
+                    st.write("**Interpretations:**")
+                    
+                    # Gender effect
+                    if model4.pvalues['sex_numeric'] < 0.05:
+                        if model4.params['sex_numeric'] > 0:
+                            st.write(f"- For the reference field (field=0), men are {np.exp(model4.params['sex_numeric']):.2f} times more likely to be promoted than women (p={model4.pvalues['sex_numeric']}).")
+                        else:
+                            st.write(f"- For the reference field (field=0), women are {1/np.exp(model4.params['sex_numeric']):.2f} times more likely to be promoted than men (p={model4.pvalues['sex_numeric']}).")
+                    else:
+                        st.write(f"- For the reference field (field=0), there is no significant difference in promotion likelihood between men and women (p={model4.pvalues['sex_numeric']}).")
+                    
+                    # Field effect
+                    if model4.pvalues['field_numeric'] < 0.05:
+                        if model4.params['field_numeric'] > 0:
+                            st.write(f"- For women, moving up one field category increases promotion likelihood by {(np.exp(model4.params['field_numeric'])-1)*100:.1f}% (p={model4.pvalues['field_numeric']}).")
+                        else:
+                            st.write(f"- For women, moving up one field category decreases promotion likelihood by {(1-np.exp(model4.params['field_numeric']))*100:.1f}% (p={model4.pvalues['field_numeric']}).")
+                    else:
+                        st.write(f"- For women, academic field does not significantly affect promotion likelihood (p={model4.pvalues['field_numeric']}).")
+                    
+                    # Interaction effect
+                    if model4.pvalues['sex_field'] < 0.05:
+                        if model4.params['sex_field'] > 0:
+                            st.write(f"- The effect of academic field is significantly stronger for men than for women (p={model4.pvalues['sex_field']}).")
+                        else:
+                            st.write(f"- The effect of academic field is significantly stronger for women than for men (p={model4.pvalues['sex_field']}).")
+                        
+                        # Calculate combined effect for men
+                        combined_effect = model4.params['field_numeric'] + model4.params['sex_field']
+                        if combined_effect > 0:
+                            st.write(f"- For men, moving up one field category increases promotion likelihood by {(np.exp(combined_effect)-1)*100:.1f}%.")
+                        else:
+                            st.write(f"- For men, moving up one field category decreases promotion likelihood by {(1-np.exp(combined_effect))*100:.1f}%.")
+                    else:
+                        st.write(f"- The effect of academic field does not significantly differ between men and women (p={model4.pvalues['sex_field']}).")
+                    
+                    # Model information
+                    model_info = pd.DataFrame({
+                        'Metric': ['Dependent Variable', 'Pseudo R-squared', 'Log-Likelihood', 'LLR p-value', 'AIC', 'BIC', 'Observations'],
+                        'Value': [
+                            'promoted (0/1)',
+                            f"{model4.prsquared:.4f}",
+                            f"{model4.llf:.4f}",
+                            f"{model4.llr_pvalue}",
+                            f"{model4.aic:.4f}",
+                            f"{model4.bic:.4f}",
+                            f"{model4.nobs}"
+                        ]
+                    })
+                    
+                    st.write("**Model Statistics:**")
+                    st.dataframe(model_info)
+                    
+                    # Coefficients table
+                    coef_table = pd.DataFrame({
+                        'Variable': ['Intercept', 'Gender (Male=1)', 'Academic Field', 'Gender × Field'],
+                        'Coefficient': [
+                            f"{model4.params['const']:.4f}",
+                            f"{model4.params['sex_numeric']:.4f}", 
+                            f"{model4.params['field_numeric']:.4f}",
+                            f"{model4.params['sex_field']:.4f}"
+                        ],
+                        'Std Error': [
+                            f"{model4.bse['const']:.4f}",
+                            f"{model4.bse['sex_numeric']:.4f}", 
+                            f"{model4.bse['field_numeric']:.4f}",
+                            f"{model4.bse['sex_field']:.4f}"
+                        ],
+                        'Z-value': [
+                            f"{model4.tvalues['const']:.4f}",
+                            f"{model4.tvalues['sex_numeric']:.4f}", 
+                            f"{model4.tvalues['field_numeric']:.4f}",
+                            f"{model4.tvalues['sex_field']:.4f}"
+                        ],
+                        'P-value': [
+                            f"{model4.pvalues['const']}",
+                            f"{model4.pvalues['sex_numeric']}", 
+                            f"{model4.pvalues['field_numeric']}",
+                            f"{model4.pvalues['sex_field']}"
+                        ],
+                        'Odds Ratio': [
+                            f"{np.exp(model4.params['const']):.4f}",
+                            f"{np.exp(model4.params['sex_numeric']):.4f}", 
+                            f"{np.exp(model4.params['field_numeric']):.4f}",
+                            f"{np.exp(model4.params['sex_field']):.4f}"
+                        ]
+                    })
+                    
+                    st.write("**Coefficients:**")
+                    st.dataframe(coef_table)
+                    
+                    # Raw output in expander
+                    with st.expander("View Raw Model 4 Output"):
+                        st.text(model4.summary().as_text())
+                        # Extract and display key tables from the raw output
+                        st.write("**Extracted Tables from Raw Output:**")
+                        
+                        # Table of coefficients
+                        st.write("*Coefficients Table:*")
+                        coef_df = pd.DataFrame({
+                            'coef': model4.params,
+                            'std err': model4.bse,
+                            'z': model4.tvalues,
+                            'P>|z|': model4.pvalues,
+                            'Odds Ratio': np.exp(model4.params),
+                            '[0.025': model4.conf_int()[0],
+                            '0.975]': model4.conf_int()[1]
+                        })
+                        st.dataframe(coef_df)
+                        
+                        # Marginal effects
+                        st.write("*Marginal Effects:*")
+                        marginal_effects = pd.DataFrame({
+                            'Variable': ['Gender (Male=1)', 'Academic Field', 'Gender × Field'],
+                            'dy/dx': [
+                                f"{model4.params['sex_numeric']:.4f}", 
+                                f"{model4.params['field_numeric']:.4f}",
+                                f"{model4.params['sex_field']:.4f}"
+                            ],
+                            'Effect': [
+                                f"{(np.exp(model4.params['sex_numeric'])-1)*100:.1f}% change in odds",
+                                f"{(np.exp(model4.params['field_numeric'])-1)*100:.1f}% change in odds",
+                                f"{(np.exp(model4.params['sex_field'])-1)*100:.1f}% change in odds"
+                            ]
+                        })
+                        st.dataframe(marginal_effects)
+                        
+                        # Model fit statistics
+                        st.write("*Model Fit Statistics:*")
+                        fit_stats = pd.DataFrame({
+                            'Metric': ['Pseudo R-squared', 'Log-Likelihood', 'LLR p-value', 'AIC', 'BIC'],
+                            'Value': [
+                                f"{model4.prsquared:.4f}",
+                                f"{model4.llf:.4f}",
+                                f"{model4.llr_pvalue}",
+                                f"{model4.aic:.4f}",
+                                f"{model4.bic:.4f}"
+                            ]
+                        })
+                        st.dataframe(fit_stats)
+        except Exception as e:
+            st.error(f"Error running Model 4: {str(e)}")
     except Exception as e:
-        st.error(f"Error performing regression analyses: {str(e)}")
+        st.error(f"Error in logistic regression analysis: {str(e)}")
         st.exception(e)
 
 def summary(df):
@@ -738,12 +1075,13 @@ def summary(df):
         except Exception as e:
             has_time_data = False
         
-        # Try to run simplified logistic model
+        # Try to run simplified models
         try:
             df_model = df.copy()
             df_model['sex_numeric'] = df_model['sex'].map({'M': 1, 'F': 0})
             df_model = df_model.replace([np.inf, -np.inf], np.nan).dropna(subset=['sex_numeric', 'promoted'])
             
+            # Basic gender model
             if len(df_model) >= 10:
                 X = sm.add_constant(df_model[['sex_numeric']])
                 y = df_model['promoted']
@@ -755,8 +1093,25 @@ def summary(df):
                 has_model = True
             else:
                 has_model = False
+                
+            # Try interaction models if data available
+            if 'admin' in df_model.columns:
+                df_model['admin'] = pd.to_numeric(df_model['admin'], errors='coerce')
+                df_model['sex_admin'] = df_model['sex_numeric'] * df_model['admin']
+                has_admin_interaction = True
+            else:
+                has_admin_interaction = False
+                
+            if 'field_numeric' in df_model.columns:
+                df_model['sex_field'] = df_model['sex_numeric'] * df_model['field_numeric']
+                has_field_interaction = True
+            else:
+                has_field_interaction = False
+                
         except Exception as e:
             has_model = False
+            has_admin_interaction = False
+            has_field_interaction = False
             
         # Create a comprehensive summary table
         summary_data = []
@@ -768,7 +1123,7 @@ def summary(df):
             summary_data.append({
                 'Analysis': 'Promotion Rate (Chi-Square)', 
                 'Finding': f"Male: {m_rate:.1f}%, Female: {f_rate:.1f}%", 
-                'P-value': f"{p:.4f}",
+                'P-value': f"{p}",
                 'Significant': "Yes" if p < 0.05 else "No"
             })
         
@@ -780,9 +1135,56 @@ def summary(df):
             summary_data.append({
                 'Analysis': 'Promotion Likelihood (Logistic Regression)', 
                 'Finding': finding, 
-                'P-value': f"{gender_pval:.4f}",
+                'P-value': f"{gender_pval}",
                 'Significant': "Yes" if gender_pval < 0.05 else "No"
             })
+            
+            # Add interaction model findings if available
+            if has_admin_interaction:
+                try:
+                    # Create admin interaction model for summary
+                    X_admin = sm.add_constant(df_model[['sex_numeric', 'admin', 'sex_admin']].dropna())
+                    y_admin = df_model.loc[X_admin.index, 'promoted']
+                    admin_model = sm.Logit(y_admin, X_admin).fit(disp=0)
+                    
+                    # Check if interaction is significant
+                    if admin_model.pvalues['sex_admin'] < 0.05:
+                        if admin_model.params['sex_admin'] > 0:
+                            admin_finding = f"Admin duties have stronger positive effect for men (p={admin_model.pvalues['sex_admin']})"
+                        else:
+                            admin_finding = f"Admin duties have stronger positive effect for women (p={admin_model.pvalues['sex_admin']})"
+                        
+                        summary_data.append({
+                            'Analysis': 'Sex × Admin Interaction', 
+                            'Finding': admin_finding, 
+                            'P-value': f"{admin_model.pvalues['sex_admin']}",
+                            'Significant': "Yes"
+                        })
+                except Exception as e:
+                    pass
+                
+            if has_field_interaction:
+                try:
+                    # Create field interaction model for summary
+                    X_field = sm.add_constant(df_model[['sex_numeric', 'field_numeric', 'sex_field']].dropna())
+                    y_field = df_model.loc[X_field.index, 'promoted']
+                    field_model = sm.Logit(y_field, X_field).fit(disp=0)
+                    
+                    # Check if interaction is significant
+                    if field_model.pvalues['sex_field'] < 0.05:
+                        if field_model.params['sex_field'] > 0:
+                            field_finding = f"Field effect is stronger for men (p={field_model.pvalues['sex_field']})"
+                        else:
+                            field_finding = f"Field effect is stronger for women (p={field_model.pvalues['sex_field']})"
+                        
+                        summary_data.append({
+                            'Analysis': 'Sex × Field Interaction', 
+                            'Finding': field_finding, 
+                            'P-value': f"{field_model.pvalues['sex_field']}",
+                            'Significant': "Yes"
+                        })
+                except Exception as e:
+                    pass
         
         if has_time_data:
             diff = avg_male_time - avg_female_time
@@ -793,7 +1195,7 @@ def summary(df):
             summary_data.append({
                 'Analysis': 'Time to Promotion (T-test)', 
                 'Finding': f"{faster} promoted {abs_diff:.2f} years faster than {slower}", 
-                'P-value': f"{p_val_time:.4f}",
+                'P-value': f"{p_val_time}",
                 'Significant': "Yes" if p_val_time < 0.05 else "No"
             })
         
@@ -813,35 +1215,74 @@ def summary(df):
             
             if p < 0.05:
                 if m_rate > f_rate:
-                    st.write(f"- **Promotion Rates**: Men have significantly higher promotion rates ({m_rate:.1f}%) than women ({f_rate:.1f}%), p={p:.4f}.")
+                    st.write(f"- **Promotion Rates**: Men have significantly higher promotion rates ({m_rate:.1f}%) than women ({f_rate:.1f}%), p={p}.")
                 else:
-                    st.write(f"- **Promotion Rates**: Women have significantly higher promotion rates ({f_rate:.1f}%) than men ({m_rate:.1f}%), p={p:.4f}.")
+                    st.write(f"- **Promotion Rates**: Women have significantly higher promotion rates ({f_rate:.1f}%) than men ({m_rate:.1f}%), p={p}.")
             else:
-                st.write(f"- **Promotion Rates**: No statistically significant difference in promotion rates between men ({m_rate:.1f}%) and women ({f_rate:.1f}%), p={p:.4f}.")
+                st.write(f"- **Promotion Rates**: No statistically significant difference in promotion rates between men ({m_rate:.1f}%) and women ({f_rate:.1f}%), p={p}.")
         
         # Logistic regression results
         if has_model:
             if gender_pval < 0.05:
                 if gender_coef > 0:
-                    st.write(f"- **Promotion Likelihood**: Men are {odds_ratio:.2f} times more likely to be promoted than women (p={gender_pval:.4f}).")
+                    st.write(f"- **Promotion Likelihood**: Men are {odds_ratio:.2f} times more likely to be promoted than women (p={gender_pval}).")
                 else:
-                    st.write(f"- **Promotion Likelihood**: Women are {1/odds_ratio:.2f} times more likely to be promoted than men (p={gender_pval:.4f}).")
+                    st.write(f"- **Promotion Likelihood**: Women are {1/odds_ratio:.2f} times more likely to be promoted than men (p={gender_pval}).")
             else:
-                st.write(f"- **Promotion Likelihood**: No significant difference in promotion likelihood between men and women (p={gender_pval:.4f}).")
+                st.write(f"- **Promotion Likelihood**: No significant difference in promotion likelihood between men and women (p={gender_pval}).")
         
         # Time to promotion
         if has_time_data:
             if p_val_time < 0.05:
                 if avg_male_time < avg_female_time:
-                    st.write(f"- **Time to Promotion**: Women take {avg_female_time - avg_male_time:.2f} years longer than men to be promoted (p={p_val_time:.4f}).")
+                    st.write(f"- **Time to Promotion**: Women take {avg_female_time - avg_male_time:.2f} years longer than men to be promoted (p={p_val_time}).")
                 else:
-                    st.write(f"- **Time to Promotion**: Men take {avg_male_time - avg_female_time:.2f} years longer than women to be promoted (p={p_val_time:.4f}).")
+                    st.write(f"- **Time to Promotion**: Men take {avg_male_time - avg_female_time:.2f} years longer than women to be promoted (p={p_val_time}).")
             else:
-                st.write(f"- **Time to Promotion**: No significant difference in time to promotion between men ({avg_male_time:.2f} years) and women ({avg_female_time:.2f} years), p={p_val_time:.4f}.")
+                st.write(f"- **Time to Promotion**: No significant difference in time to promotion between men ({avg_male_time:.2f} years) and women ({avg_female_time:.2f} years), p={p_val_time}.")
+        
+        # Interaction effects
+        admin_model = None
+        field_model = None
+        
+        if has_model and has_admin_interaction:
+            try:
+                # Check admin interaction model
+                X_admin = sm.add_constant(df_model[['sex_numeric', 'admin', 'sex_admin']].dropna())
+                y_admin = df_model.loc[X_admin.index, 'promoted']
+                admin_model = sm.Logit(y_admin, X_admin).fit(disp=0)
+                
+                if admin_model.pvalues['sex_admin'] < 0.05:
+                    if admin_model.params['sex_admin'] > 0:
+                        st.write(f"- **Administrative Duties**: The effect of administrative duties on promotion is significantly stronger for men than women (p={admin_model.pvalues['sex_admin']}).")
+                    else:
+                        st.write(f"- **Administrative Duties**: The effect of administrative duties on promotion is significantly stronger for women than men (p={admin_model.pvalues['sex_admin']}).")
+            except Exception as e:
+                pass
+                
+        if has_model and has_field_interaction:
+            try:
+                # Check field interaction model
+                X_field = sm.add_constant(df_model[['sex_numeric', 'field_numeric', 'sex_field']].dropna())
+                y_field = df_model.loc[X_field.index, 'promoted']
+                field_model = sm.Logit(y_field, X_field).fit(disp=0)
+                
+                if field_model.pvalues['sex_field'] < 0.05:
+                    if field_model.params['sex_field'] > 0:
+                        st.write(f"- **Academic Field**: The effect of academic field on promotion varies by gender, with a stronger effect for men (p={field_model.pvalues['sex_field']}).")
+                    else:
+                        st.write(f"- **Academic Field**: The effect of academic field on promotion varies by gender, with a stronger effect for women (p={field_model.pvalues['sex_field']}).")
+            except Exception as e:
+                pass
         
         # Overall conclusion
         st.write("### Overall Conclusion")
-        if (has_chi2 and p < 0.05) or (has_model and gender_pval < 0.05) or (has_time_data and p_val_time < 0.05):
+        
+        # Check for significant findings in any model
+        sig_admin = admin_model is not None and admin_model.pvalues['sex_admin'] < 0.05
+        sig_field = field_model is not None and field_model.pvalues['sex_field'] < 0.05
+        
+        if (has_chi2 and p < 0.05) or (has_model and gender_pval < 0.05) or (has_time_data and p_val_time < 0.05) or sig_admin or sig_field:
             st.write("Based on the analysis, there is evidence of sex differences in promotion outcomes. The specific patterns are detailed above.")
         else:
             st.write("Based on the analysis, there is no strong evidence of sex bias in promotion decisions after controlling for relevant factors.")
@@ -861,12 +1302,24 @@ def run_analysis(uploaded_file):
     
     if df is not None:
         with tabs[0]:
-            exploratory_analysis(df)
+            try:
+                exploratory_analysis(df)
+            except Exception as e:
+                st.error(f"Error in exploratory analysis: {str(e)}")
+                st.exception(e)
         
         with tabs[1]:
-            statistical_tests(df)
+            try:
+                statistical_tests(df)
+            except Exception as e:
+                st.error(f"Error in statistical tests: {str(e)}")
+                st.exception(e)
         
         with tabs[2]:
-            summary(df)
+            try:
+                summary(df)
+            except Exception as e:
+                st.error(f"Error in summary: {str(e)}")
+                st.exception(e)
     else:
         st.error("Unable to process data for Question 4. Please check file format and ensure it contains Associate and Full Professor data.")
