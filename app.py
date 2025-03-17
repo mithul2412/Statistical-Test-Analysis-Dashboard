@@ -8,7 +8,7 @@ import sys
 import traceback
 
 # Try importing individual question modules with error handling
-st.set_page_config(page_title="Faculty Analysis Dashboard", layout="wide")
+st.set_page_config(page_title="BIOST 557A Course Project", layout="wide")
 
 # Change these lines in app.py:
 try:
@@ -92,7 +92,7 @@ try:
     def main():
         st.title("Faculty Analysis Dashboard")
         
-        # Display module import status
+        # # Display module import status
         # with st.expander("Debug Information"):
         #     st.write("### Available Modules")
         #     for module in modules_available:
@@ -192,11 +192,11 @@ try:
                 st.info("Please ensure your file is in the correct format (CSV or tab/space-separated).")
         
         else:
-            st.header("Faculty Analysis Dashboard")
+            st.header("BIOST 557A Course Project")
             st.write("""
             This application allows you to analyze faculty data for potential gender bias in:
             
-            1. **Current Salaries** - Is there a gender gap in overall compensation?
+            1. **Recent Year** - Is there a gender gap in recent year?
             2. **Starting Salaries** - Are there differences in initial compensation?
             3. **Salary Increases** - Are raises distributed equitably over time?
             4. **Promotion Decisions** - Do promotion rates and timing differ by gender?
@@ -217,14 +217,15 @@ try:
             - **rank**: Academic rank (e.g., Full, Assoc, Assist)
             - **admin**: Administrative duties (0/1)
             - **salary**: Annual salary
-            - **startyr**: Start year (for Questions 2, 3 & 4)
-            - **yrdeg**: Year degree was obtained (for Question 4)
+            - **startyr**: Start year
+            - **yrdeg**: Year degree was obtained 
             
             The file should be in CSV format or space/tab-separated text.
             """)
     
     if __name__ == "__main__":
         main()
+        
 except Exception as e:
     st.error(f"Critical error in app initialization: {str(e)}")
     st.code(traceback.format_exc())
