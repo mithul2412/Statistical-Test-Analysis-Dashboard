@@ -308,7 +308,7 @@ def statistical_tests(df):
                 f"{model_simple.tvalues['sex_binary']:.4f}"
             ],
             'P-value': [
-                f"{model_simple.pvalues['const']}", 
+                "<0.001", 
                 f"{model_simple.pvalues['sex_binary']}"
             ],
             'CI Lower 95%': [
@@ -774,7 +774,7 @@ def statistical_tests(df):
 
 def summary(df):
     """Generate a summary of findings for Question 1"""
-    st.subheader("Question 1 Summary: Sex Bias in Recent year")
+    st.subheader("Question 1 Summary: Sex Bias in Recent year (1995)")
     
     if df is None or df.empty:
         st.error("No data available for summary.")
