@@ -6,7 +6,6 @@ import seaborn as sns
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy import stats
-import cpi
 
 # Define palette for consistent colors
 custom_palette = {'M': 'skyblue', 'F': 'lightcoral'}
@@ -42,26 +41,14 @@ def load_data(uploaded_file):
                 st.error("Too few records match the criteria where startyr == year. Please check your dataset.")
                 return None
                 
-            # Calculate inflation-adjusted salary
-            try:
-                # Update the CPI data
-                cpi.update()
-
-                # Get unique start years and compute inflation factors for each
-                unique_years = df['startyr'].unique()
-                inflation_factors = {year: cpi.inflate(1, year, to=1995) for year in unique_years}
-
-                # Adjust salaries using vectorized multiplication
-                df['inf_salary'] = df['salary'] * df['startyr'].map(inflation_factors)
-
-            except Exception as e:
-                # st.warning(f"Unable to adjust for inflation: {str(e)}. Using raw salary values.")
-                df['inf_salary'] = df['salary']
+            # Use raw salary without inflation adjustment
+            df['inf_salary'] = df['salary']
                 
             # Center startyr (for regression to reduce collinearity)
             df['startyr_centered'] = df['startyr'] - df['startyr'].mean()
             
             return df
+        
         except Exception as e:
             st.error(f"Error in data preprocessing: {str(e)}")
             st.warning("Attempting alternative data processing approach...")
@@ -76,7 +63,7 @@ def load_data(uploaded_file):
                 df['yrdeg'] = df['yrdeg'].apply(lambda x: 1900 + x if x >= 76 else 2000 + x)
                 
             # Create minimal variables
-            df['inf_salary'] = df['salary'].copy()  # Fallback without inflation adjustment
+            df['inf_salary'] = df['salary'].copy()  # Using raw salary without inflation
             df['exp'] = 0
             if 'yrdeg' in df.columns and 'startyr' in df.columns:
                 df['exp'] = df['startyr'] - df['yrdeg']
@@ -93,7 +80,7 @@ def load_data(uploaded_file):
         return None
 
 def exploratory_analysis(df):
-    st.subheader("Exploratory Data Analysis")
+    st.subheader("Summary Statistics")
     
     # Split data by sex
     df_M = df[df['sex'] == 'M']
@@ -103,11 +90,11 @@ def exploratory_analysis(df):
     col1, col2 = st.columns(2)
     with col1:
         st.write("Male Faculty Summary:")
-        st.dataframe(df_M[['salary', 'inf_salary', 'startyr', 'exp']].describe())
+        st.dataframe(df_M[['salary', 'startyr', 'exp']].describe())
     
     with col2:
         st.write("Female Faculty Summary:")
-        st.dataframe(df_F[['salary', 'inf_salary', 'startyr', 'exp']].describe())
+        st.dataframe(df_F[['salary', 'startyr', 'exp']].describe())
     
     # Count display
     st.write(f"Count Male: {len(df_M)}, Count Female: {len(df_F)}")
@@ -127,7 +114,7 @@ def exploratory_analysis(df):
     st.dataframe(hiring_stats)
     
     # Visualizations
-    st.write("### Salary Visualizations")
+    st.write("### Visualizations")
     
     # Create two columns for the first row of charts
     col1, col2 = st.columns(2)
@@ -178,44 +165,14 @@ def exploratory_analysis(df):
         st.pyplot(fig3)
     
     with col4:
-        # Line plot of inflation-adjusted average salaries
-        # avg_inf_male = df_M.groupby('startyr')['inf_salary'].mean()
-        # avg_inf_female = df_F.groupby('startyr')['inf_salary'].mean()
-        
-        # fig4, ax4 = plt.subplots(figsize=(8, 6))
-        # ax4.plot(avg_inf_male.index, avg_inf_male.values, 
-        #          color='skyblue', linestyle='-', marker='o', label='Male')
-        # ax4.plot(avg_inf_female.index, avg_inf_female.values, 
-        #          color='lightcoral', linestyle='-', marker='o', label='Female')
-        # ax4.set_xlabel('Start Year')
-        # ax4.set_ylabel('Inflation-Adjusted Salary (1995 $)')
-        # ax4.set_title('Inflation-Adjusted Salary Trends by Start Year')
-        # ax4.legend()
-        # ax4.grid(True)
-        # st.pyplot(fig4)
+        # Distribution of salaries - added as fourth graph
         fig4, ax4 = plt.subplots(figsize=(8, 6))
-        bp = ax4.boxplot([df_M['inf_salary'], df_F['inf_salary']], labels=['Male', 'Female'], patch_artist=True)
-        for box, color in zip(bp['boxes'], ['skyblue', 'lightcoral']):
-            box.set(facecolor=color, alpha=0.8)
-        ax4.set_xlabel('Sex')
-        ax4.set_ylabel('Inflation-Adjusted Starting Salary (1995 $)')
-        ax4.set_title('Distribution of Inflation-Adjusted Starting Salaries by Sex')
+        sns.histplot(data=df, x='salary', hue='sex', kde=True, palette=custom_palette, alpha=0.5, ax=ax4)
+        ax4.set_xlabel('Starting Salary')
+        ax4.set_ylabel('Count')
+        ax4.set_title('Distribution of Starting Salaries by Sex')
         ax4.grid(True)
         st.pyplot(fig4)
-    
-    # # Distribution of inflated salaries - make smaller and centered
-    # col1, col2, col3 = st.columns([1, 2, 1])
-    
-    # with col2:  # Center column
-    #     fig5, ax5 = plt.subplots(figsize=(6, 4))
-    #     bp = ax5.boxplot([df_M['inf_salary'], df_F['inf_salary']], labels=['Male', 'Female'], patch_artist=True)
-    #     for box, color in zip(bp['boxes'], ['skyblue', 'lightcoral']):
-    #         box.set(facecolor=color, alpha=0.8)
-    #     ax5.set_xlabel('Sex')
-    #     ax5.set_ylabel('Inflation-Adjusted Starting Salary (1995 $)')
-    #     ax5.set_title('Distribution of Inflation-Adjusted Starting Salaries by Sex')
-    #     ax5.grid(True)
-    #     st.pyplot(fig5)
 
 def statistical_tests(df):
     st.subheader("Statistical Tests")
@@ -228,9 +185,18 @@ def statistical_tests(df):
     def twoSampleTTest(col1, col2, alpha=0.05):
         result = stats.ttest_ind(col1, col2, equal_var=False)  # not assuming equal variance
         t_stat, p_val = result.statistic, result.pvalue
-        dof = result.df
+        # Compute degrees of freedom using the Welch–Satterthwaite approximation
+        n1, n2 = len(col1), len(col2)
+        var1, var2 = np.var(col1, ddof=1), np.var(col2, ddof=1)
+        dof = (var1/n1 + var2/n2) ** 2 / (((var1/n1) ** 2) / (n1 - 1) + ((var2/n2) ** 2) / (n2 - 1))
+        
+        # Determine the critical t-value for the given alpha level and degrees of freedom
         critical_val = stats.t.ppf(1 - alpha/2, dof)
-        CI = result.confidence_interval()
+        
+        # Compute the confidence interval for the difference in means
+        mean_diff = np.mean(col1) - np.mean(col2)
+        se_diff = np.sqrt(var1/n1 + var2/n2)
+        CI = (mean_diff - critical_val * se_diff, mean_diff + critical_val * se_diff)
         if np.abs(t_stat) > critical_val:
             reject_h0 = True
         else:
@@ -238,7 +204,7 @@ def statistical_tests(df):
         return t_stat, p_val, dof, critical_val, CI, reject_h0
     
     # Raw salary t-test
-    st.write("### T-Test on Raw Starting Salaries")
+    st.write("### T-Test on Starting Salaries")
     t_stat, p_val, dof, critical_val, CI, reject_h0 = twoSampleTTest(df_M['salary'], df_F['salary'])
     
     ttest_raw_results = pd.DataFrame({
@@ -247,7 +213,7 @@ def statistical_tests(df):
         'Value': [
             f"${df_M['salary'].mean() - df_F['salary'].mean():.2f}",
             f"{t_stat:.4f}",
-            f"{p_val:.4f}",
+            f"{p_val}",
             f"{dof:.2f}",
             f"{critical_val:.4f}",
             f"${CI[0]:.2f}",
@@ -260,41 +226,12 @@ def statistical_tests(df):
     
     if reject_h0:
         if df_M['salary'].mean() > df_F['salary'].mean():
-            st.write(f"**Interpretation**: There is a statistically significant difference in starting salaries. On average, men receive ${df_M['salary'].mean() - df_F['salary'].mean():.2f} more than women (p={p_val:.4f}).")
+            st.write(f"**Interpretation**: There is a statistically significant difference in starting salaries. On average, men receive ${df_M['salary'].mean() - df_F['salary'].mean():.2f} more than women (p={p_val}).")
         else:
-            st.write(f"**Interpretation**: There is a statistically significant difference in starting salaries. On average, women receive ${df_F['salary'].mean() - df_M['salary'].mean():.2f} more than men (p={p_val:.4f}).")
+            st.write(f"**Interpretation**: There is a statistically significant difference in starting salaries. On average, women receive ${df_F['salary'].mean() - df_M['salary'].mean():.2f} more than men (p={p_val}).")
     else:
-        st.write(f"**Interpretation**: There is no statistically significant difference in raw starting salaries between men and women (p={p_val:.4f}).")
+        st.write(f"**Interpretation**: There is no statistically significant difference in starting salaries between men and women (p={p_val}).")
     
-    # Inflation-adjusted salary t-test
-    st.write("### T-Test on Inflation-Adjusted Starting Salaries")
-    t_stat, p_val, dof, critical_val, CI, reject_h0 = twoSampleTTest(df_M['inf_salary'], df_F['inf_salary'])
-    
-    ttest_inf_results = pd.DataFrame({
-        'Statistic': ['Sample Mean Difference', 'T-statistic', 'P-value', 'Degrees of Freedom', 
-                      'Critical Value', 'CI Lower', 'CI Upper', 'Reject H0'],
-        'Value': [
-            f"${df_M['inf_salary'].mean() - df_F['inf_salary'].mean():.2f}",
-            f"{t_stat:.4f}",
-            f"{p_val:.4f}",
-            f"{dof:.2f}",
-            f"{critical_val:.4f}",
-            f"${CI[0]:.2f}",
-            f"${CI[1]:.2f}",
-            "Yes" if reject_h0 else "No"
-        ]
-    })
-    
-    st.dataframe(ttest_inf_results)
-    
-    if reject_h0:
-        if df_M['inf_salary'].mean() > df_F['inf_salary'].mean():
-            st.write(f"**Interpretation**: After adjusting for inflation, there is a statistically significant difference in starting salaries. On average, men receive ${df_M['inf_salary'].mean() - df_F['inf_salary'].mean():.2f} more than women in 1995 dollars (p={p_val:.4f}).")
-        else:
-            st.write(f"**Interpretation**: After adjusting for inflation, there is a statistically significant difference in starting salaries. On average, women receive ${df_F['inf_salary'].mean() - df_M['inf_salary'].mean():.2f} more than men in 1995 dollars (p={p_val:.4f}).")
-    else:
-        st.write(f"**Interpretation**: After adjusting for inflation, there is no statistically significant difference in starting salaries between men and women (p={p_val:.4f}).")
-
     # Center the startyr variable to reduce multicollinearity
     df['startyr_centered'] = df['startyr'] - df['startyr'].mean()
     
@@ -307,7 +244,7 @@ def statistical_tests(df):
     # Display regression results in a more structured format
     st.write("#### Model 1: Sex Only")
     try:
-        model1 = smf.ols(formula="inf_salary ~ C(sex)", data=df).fit()
+        model1 = smf.ols(formula="salary ~ C(sex)", data=df).fit()
         
         # Extract and display key results
         coef = model1.params.get('C(sex)[T.M]', 0)  # Get the coefficient for male
@@ -324,7 +261,7 @@ def statistical_tests(df):
                 f"{r_squared:.4f}",
                 f"{adj_r_squared:.4f}",
                 f"{f_stat:.4f}",
-                f"{f_pvalue:.4f}",
+                f"{f_pvalue}",
                 f"{model1.aic:.4f}",
                 f"{model1.bic:.4f}",
                 f"{model1.nobs}"
@@ -351,7 +288,7 @@ def statistical_tests(df):
             ],
             'P-value': [
                 f"{model1.pvalues['Intercept']:.4f}", 
-                f"{p_val:.4f}"
+                f"{p_val}"
             ],
             'CI Lower 95%': [
                 f"{model1.conf_int().loc['Intercept'][0]:.2f}",
@@ -369,7 +306,7 @@ def statistical_tests(df):
         # Summary of sex effect
         model1_results = pd.DataFrame({
             'Statistic': ['Sex Effect (Male)', 'P-value', 'R-squared'],
-            'Value': [f"${coef:.2f}", f"{p_val:.4f}", f"{r_squared:.4f}"]
+            'Value': [f"${coef:.2f}", f"{p_val}", f"{r_squared:.4f}"]
         })
         
         st.write("**Sex Effect Summary:**")
@@ -378,11 +315,11 @@ def statistical_tests(df):
         # Interpretation
         if p_val < 0.05:
             if coef > 0:
-                st.write(f"**Interpretation**: Men earn ${coef:.2f} more than women on average (p={p_val:.4f}).")
+                st.write(f"**Interpretation**: Men earn ${coef:.2f} more than women on average (p={p_val}).")
             else:
-                st.write(f"**Interpretation**: Women earn ${abs(coef):.2f} more than men on average (p={p_val:.4f}).")
+                st.write(f"**Interpretation**: Women earn ${abs(coef):.2f} more than men on average (p={p_val}).")
         else:
-            st.write(f"**Interpretation**: No significant difference in salary between men and women (p={p_val:.4f}).")
+            st.write(f"**Interpretation**: No significant difference in salary between men and women (p={p_val}).")
         
         # Display full model results in an expander
         with st.expander("View Full Model 1 Results"):
@@ -394,7 +331,7 @@ def statistical_tests(df):
     # Full model with controls
     st.write("#### Model 2: Controlling for Field, Rank, Degree, etc.")
     try:
-        model2 = smf.ols(formula="inf_salary ~ C(sex) + C(field) + C(rank) + C(deg) + admin + startyr_centered + yrdeg + exp_coded", data=df).fit()
+        model2 = smf.ols(formula="salary ~ C(sex) + C(field) + C(rank) + C(deg) + admin + startyr_centered + yrdeg + exp_coded", data=df).fit()
         
         # Extract key results
         coef = model2.params.get('C(sex)[T.M]', 0)  # Get the coefficient for male
@@ -412,7 +349,7 @@ def statistical_tests(df):
                 f"{r_squared:.4f}",
                 f"{adj_r_squared:.4f}",
                 f"{f_stat:.4f}",
-                f"{f_pvalue:.4f}",
+                f"{f_pvalue}",
                 f"{model2.aic:.4f}",
                 f"{model2.bic:.4f}",
                 f"{model2.nobs}"
@@ -444,7 +381,7 @@ def statistical_tests(df):
                 'Coefficient': f"{model2.params[var]:.2f}",
                 'Std Error': f"{model2.bse[var]:.2f}",
                 't-value': f"{model2.tvalues[var]:.4f}",
-                'P-value': f"{model2.pvalues[var]:.4f}",
+                'P-value': f"{model2.pvalues[var]}",
                 'Significant': "Yes" if model2.pvalues[var] < 0.05 else "No"
             })
         
@@ -463,7 +400,7 @@ def statistical_tests(df):
         # Create a DataFrame specifically for the sex effect
         model2_results = pd.DataFrame({
             'Statistic': ['Adjusted Sex Effect (Male)', 'P-value', 'R-squared', 'CI Lower', 'CI Upper'],
-            'Value': [f"${coef:.2f}", f"{p_val:.4f}", f"{r_squared:.4f}", f"${ci[0]:.2f}", f"${ci[1]:.2f}"]
+            'Value': [f"${coef:.2f}", f"{p_val}", f"{r_squared:.4f}", f"${ci[0]:.2f}", f"${ci[1]:.2f}"]
         })
         
         st.write("**Sex Effect Summary (Model 2):**")
@@ -472,11 +409,11 @@ def statistical_tests(df):
         # Interpretation
         if p_val < 0.05:
             if coef > 0:
-                st.write(f"**Interpretation**: After controlling for other factors, men earn ${coef:.2f} more than women on average (p={p_val:.4f}).")
+                st.write(f"**Interpretation**: After controlling for other factors, men earn ${coef:.2f} more than women on average (p={p_val}).")
             else:
-                st.write(f"**Interpretation**: After controlling for other factors, women earn ${abs(coef):.2f} more than men on average (p={p_val:.4f}).")
+                st.write(f"**Interpretation**: After controlling for other factors, women earn ${abs(coef):.2f} more than men on average (p={p_val}).")
         else:
-            st.write(f"**Interpretation**: After controlling for other factors, no significant difference in salary between men and women (p={p_val:.4f}).")
+            st.write(f"**Interpretation**: After controlling for other factors, no significant difference in salary between men and women (p={p_val}).")
         
         # Display full model results in an expander
         with st.expander("View Full Model 2 Results"):
@@ -488,7 +425,7 @@ def statistical_tests(df):
     # Interaction models
     st.write("#### Model 3: Sex × Rank Interaction")
     try:
-        model3 = smf.ols(formula="inf_salary ~ C(sex) + C(field) + C(sex)*C(rank) + C(deg) + admin + startyr_centered", data=df).fit()
+        model3 = smf.ols(formula="salary ~ C(sex) + C(field) + C(sex)*C(rank) + C(deg) + admin + startyr_centered", data=df).fit()
         
         # Model statistics
         model3_stats = pd.DataFrame({
@@ -497,7 +434,7 @@ def statistical_tests(df):
                 f"{model3.rsquared:.4f}",
                 f"{model3.rsquared_adj:.4f}",
                 f"{model3.fvalue:.4f}",
-                f"{model3.f_pvalue:.4f}",
+                f"{model3.f_pvalue}",
                 f"{model3.aic:.4f}",
                 f"{model3.bic:.4f}",
                 f"{model3.nobs}"
@@ -522,7 +459,7 @@ def statistical_tests(df):
                     'Coefficient': f"${coef:.2f}",
                     'Std Error': f"{model3.bse[term]:.2f}",
                     't-value': f"{model3.tvalues[term]:.4f}",
-                    'P-value': f"{p_val:.4f}",
+                    'P-value': f"{p_val}",
                     'Significant': "Yes" if p_val < 0.05 else "No"
                 })
             
@@ -541,9 +478,9 @@ def statistical_tests(df):
                     p_val = float(inter['P-value'])
                     
                     if coef > 0:
-                        st.write(f"- For {rank} professors, men earn ${coef:.2f} more than would be expected from the main effects alone (p={p_val:.4f}).")
+                        st.write(f"- For {rank} professors, men earn ${coef:.2f} more than would be expected from the main effects alone (p={p_val}).")
                     else:
-                        st.write(f"- For {rank} professors, men earn ${abs(coef):.2f} less than would be expected from the main effects alone (p={p_val:.4f}).")
+                        st.write(f"- For {rank} professors, men earn ${abs(coef):.2f} less than would be expected from the main effects alone (p={p_val}).")
             else:
                 st.write("**No significant interactions found between sex and rank.**")
                 
@@ -579,33 +516,31 @@ def summary(df):
     
     # Calculate basic differences
     raw_diff = df_M['salary'].mean() - df_F['salary'].mean()
-    inf_diff = df_M['inf_salary'].mean() - df_F['inf_salary'].mean()
     
     # Run t-test
     t_stat, p_val = stats.ttest_ind(df_M['salary'], df_F['salary'], equal_var=False)
     
     # Run simple regression for summary
     try:
-        simple_model = smf.ols(formula="inf_salary ~ C(sex)", data=df).fit()
+        simple_model = smf.ols(formula="salary ~ C(sex)", data=df).fit()
         sex_coef = simple_model.params.get('C(sex)[T.M]', 0)
         sex_pval = simple_model.pvalues.get('C(sex)[T.M]', 1)
         
         # Run full model
-        full_model = smf.ols(formula="inf_salary ~ C(sex) + C(field) + C(rank) + C(deg) + admin + startyr_centered + yrdeg + exp_coded", data=df).fit()
+        full_model = smf.ols(formula="salary ~ C(sex) + C(field) + C(rank) + C(deg) + admin + startyr_centered + yrdeg + exp_coded", data=df).fit()
         adj_sex_coef = full_model.params.get('C(sex)[T.M]', 0)
         adj_sex_pval = full_model.pvalues.get('C(sex)[T.M]', 1)
         
         # Check if we have interaction model info
-        interaction_model = smf.ols(formula="inf_salary ~ C(sex) + C(field) + C(sex)*C(rank) + C(deg) + admin + startyr_centered", data=df).fit()
+        interaction_model = smf.ols(formula="salary ~ C(sex) + C(field) + C(sex)*C(rank) + C(deg) + admin + startyr_centered", data=df).fit()
         interaction_terms = [term for term in interaction_model.params.index if 'C(sex)[T.M]:C(rank)' in term]
         significant_interactions = [term for term in interaction_terms if interaction_model.pvalues[term] < 0.05]
         
         # Create summary table
         summary_data = [
-            {'Analysis': 'Raw Salary Difference', 'Finding': f"${raw_diff:.2f} {'higher for men' if raw_diff > 0 else 'higher for women'}", 'P-value': f"{p_val:.4f}", 'Significant': "Yes" if p_val < 0.05 else "No"},
-            {'Analysis': 'Adjusted for Inflation', 'Finding': f"${inf_diff:.2f} {'higher for men' if inf_diff > 0 else 'higher for women'}", 'P-value': f"{p_val:.4f}", 'Significant': "Yes" if p_val < 0.05 else "No"},
-            {'Analysis': 'Simple Regression', 'Finding': f"${sex_coef:.2f} {'higher for men' if sex_coef > 0 else 'higher for women'}", 'P-value': f"{sex_pval:.4f}", 'Significant': "Yes" if sex_pval < 0.05 else "No"},
-            {'Analysis': 'Full Model with Controls', 'Finding': f"${adj_sex_coef:.2f} {'higher for men' if adj_sex_coef > 0 else 'higher for women'}", 'P-value': f"{adj_sex_pval:.4f}", 'Significant': "Yes" if adj_sex_pval < 0.05 else "No"}
+            {'Analysis': 'Raw Salary Difference', 'Finding': f"${raw_diff:.2f} {'higher for men' if raw_diff > 0 else 'higher for women'}", 'P-value': f"{p_val}", 'Significant': "Yes" if p_val < 0.05 else "No"},
+            {'Analysis': 'Simple Regression', 'Finding': f"${sex_coef:.2f} {'higher for men' if sex_coef > 0 else 'higher for women'}", 'P-value': f"{sex_pval}", 'Significant': "Yes" if sex_pval < 0.05 else "No"},
+            {'Analysis': 'Full Model with Controls', 'Finding': f"${adj_sex_coef:.2f} {'higher for men' if adj_sex_coef > 0 else 'higher for women'}", 'P-value': f"{adj_sex_pval}", 'Significant': "Yes" if adj_sex_pval < 0.05 else "No"}
         ]
         
         summary_df = pd.DataFrame(summary_data)
@@ -617,20 +552,20 @@ def summary(df):
         # Raw difference
         if p_val < 0.05:
             if raw_diff > 0:
-                st.write(f"- In raw dollars, men earn ${raw_diff:.2f} more than women on average at the time of hiring (p={p_val:.4f}).")
+                st.write(f"- In raw dollars, men earn ${raw_diff:.2f} more than women on average at the time of hiring (p={p_val}).")
             else:
-                st.write(f"- In raw dollars, women earn ${abs(raw_diff):.2f} more than men on average at the time of hiring (p={p_val:.4f}).")
+                st.write(f"- In raw dollars, women earn ${abs(raw_diff):.2f} more than men on average at the time of hiring (p={p_val}).")
         else:
-            st.write(f"- No statistically significant difference in raw starting salaries between men and women (p={p_val:.4f}).")
+            st.write(f"- No statistically significant difference in raw starting salaries between men and women (p={p_val}).")
         
         # Adjusted difference
         if adj_sex_pval < 0.05:
             if adj_sex_coef > 0:
-                st.write(f"- After controlling for field, rank, degree, and other factors, men earn ${adj_sex_coef:.2f} more than women on average (p={adj_sex_pval:.4f}).")
+                st.write(f"- After controlling for field, rank, degree, and other factors, men earn ${adj_sex_coef:.2f} more than women on average (p={adj_sex_pval}).")
             else:
-                st.write(f"- After controlling for field, rank, degree, and other factors, women earn ${abs(adj_sex_coef):.2f} more than men on average (p={adj_sex_pval:.4f}).")
+                st.write(f"- After controlling for field, rank, degree, and other factors, women earn ${abs(adj_sex_coef):.2f} more than men on average (p={adj_sex_pval}).")
         else:
-            st.write(f"- After controlling for field, rank, degree, and other factors, there is no significant difference in starting salaries (p={adj_sex_pval:.4f}).")
+            st.write(f"- After controlling for field, rank, degree, and other factors, there is no significant difference in starting salaries (p={adj_sex_pval}).")
         
         # Interaction effects
         if significant_interactions:
@@ -641,9 +576,9 @@ def summary(df):
                 rank = term.split('[T.')[2].split(']')[0]
                 
                 if coef > 0:
-                    st.write(f"  * For {rank} professors, men earn ${coef:.2f} more than would be expected (p={p_val:.4f})")
+                    st.write(f"  * For {rank} professors, men earn ${coef:.2f} more than would be expected (p={p_val})")
                 else:
-                    st.write(f"  * For {rank} professors, men earn ${abs(coef):.2f} less than would be expected (p={p_val:.4f})")
+                    st.write(f"  * For {rank} professors, men earn ${abs(coef):.2f} less than would be expected (p={p_val})")
         else:
             st.write("- No significant interactions were found between sex and academic rank.")
         
