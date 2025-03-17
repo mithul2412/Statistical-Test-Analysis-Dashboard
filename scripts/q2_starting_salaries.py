@@ -176,7 +176,10 @@ def exploratory_analysis(df):
 
 def statistical_tests(df):
     st.subheader("Statistical Tests")
-    
+
+    st.write('### Note: Performance Optimization')
+    st.write('This application analyzes sex bias in faculty starting salaries using raw salary data instead of inflation-adjusted values, as the CPI librarys processing time (nearly 10 minutes) would significantly impact user experience in the interactive Streamlit deployment; this approach maintains statistical validity while prioritizing responsiveness and real-time interactivity.')
+        
     # Split data by sex
     df_M = df[df['sex'] == 'M']
     df_F = df[df['sex'] == 'F']
@@ -509,6 +512,10 @@ def statistical_tests(df):
 
 def summary(df):
     st.subheader("Question 2 Summary: Sex Bias in Starting Salaries")
+
+    st.write('### Note: Performance Optimization')
+    st.write('This application analyzes sex bias in faculty starting salaries using raw salary data instead of inflation-adjusted values, as the CPI librarys processing time (nearly 10 minutes) would significantly impact user experience in the interactive Streamlit deployment; this approach maintains statistical validity while prioritizing responsiveness and real-time interactivity.')
+        
     
     # Split data by sex
     df_M = df[df['sex'] == 'M']
@@ -545,6 +552,7 @@ def summary(df):
         
         summary_df = pd.DataFrame(summary_data)
         st.dataframe(summary_df)
+
         
         # Overall findings
         st.write("### Key Findings")
