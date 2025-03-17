@@ -125,15 +125,15 @@ def exploratory_analysis(df_filtered, salary_growth):
         
         # Use transparent bins with outlines for better visibility
         sns.histplot(salary_growth[salary_growth['sex'] == 'M']['salary_slope'],
-                    bins=20, alpha=0.6, color=custom_palette['M'], 
+                    bins=30, stat='density', kde=True, color=custom_palette['M'], 
                     edgecolor='darkblue', label='Male', ax=ax4)
         sns.histplot(salary_growth[salary_growth['sex'] == 'F']['salary_slope'],
-                    bins=20, alpha=0.6, color=custom_palette['F'], 
+                    bins=30, stat='density', kde=True, color=custom_palette['F'], 
                     edgecolor='darkred', label='Female', ax=ax4)
         
         ax4.set_title("Distribution of Salary Growth Rates by Sex")
         ax4.set_xlabel("Annual Salary Growth ($)")
-        ax4.set_ylabel("Count")
+        ax4.set_ylabel("Density")
         ax4.legend()
         
         st.pyplot(fig4)
