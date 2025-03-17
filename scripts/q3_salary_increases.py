@@ -70,13 +70,15 @@ def create_wide_format(df):
         return None, None
 
 def exploratory_analysis(df_filtered, salary_growth):
-    st.subheader("Exploratory Analysis")
+    st.subheader("Summary Statistics")
     
     # Summary of salary increases by sex
     summary_stats = salary_growth.groupby('sex')[['salary_increase', 'salary_increase_pct', 'salary_slope']].describe()
     st.write("Summary of Salary Increases by Sex:")
     st.dataframe(summary_stats)
     
+    st.write("### Visualizations")
+
     # Create columns for the charts
     col1, col2 = st.columns(2)
     
@@ -149,7 +151,7 @@ def statistical_tests(df_filtered, salary_growth):
         'Statistic': ['t-statistic', 'p-value', 'Mean male growth rate', 'Mean female growth rate', 'Difference in means'],
         'Value': [
             f"{t_stat:.4f}",
-            f"{p_value:.4f}",
+            f"{p_value}",
             f"${male_slopes.mean():.2f} per year",
             f"${female_slopes.mean():.2f} per year",
             f"${male_slopes.mean() - female_slopes.mean():.2f} per year"
@@ -162,11 +164,11 @@ def statistical_tests(df_filtered, salary_growth):
     # Add interpretation
     if p_value < 0.05:
         if male_slopes.mean() > female_slopes.mean():
-            st.write(f"**Interpretation**: There is a statistically significant difference in salary growth rates. Men received ${male_slopes.mean() - female_slopes.mean():.2f} more per year in raises than women (p={p_value:.4f}).")
+            st.write(f"**Interpretation**: There is a statistically significant difference in salary growth rates. Men received ${male_slopes.mean() - female_slopes.mean():.2f} more per year in raises than women (p={p_value}).")
         else:
-            st.write(f"**Interpretation**: There is a statistically significant difference in salary growth rates. Women received ${female_slopes.mean() - male_slopes.mean():.2f} more per year in raises than men (p={p_value:.4f}).")
+            st.write(f"**Interpretation**: There is a statistically significant difference in salary growth rates. Women received ${female_slopes.mean() - male_slopes.mean():.2f} more per year in raises than men (p={p_value}).")
     else:
-        st.write(f"**Interpretation**: There is no statistically significant difference in salary growth rates between men and women (p={p_value:.4f}).")
+        st.write(f"**Interpretation**: There is no statistically significant difference in salary growth rates between men and women (p={p_value}).")
     
     # Create OLS Models
     # 1. Create dummy variable for sex (M=0, F=1)
@@ -196,7 +198,7 @@ def statistical_tests(df_filtered, salary_growth):
         # Create a DataFrame for clean display
         model1_results = pd.DataFrame({
             'Statistic': ['Effect of being female on salary growth', 'P-value', 'R-squared'],
-            'Value': [f"${sex_coef:.2f} per year", f"{sex_pval:.4f}", f"{r_squared:.4f}"]
+            'Value': [f"${sex_coef:.2f} per year", f"{sex_pval}", f"{r_squared:.4f}"]
         })
         
         st.dataframe(model1_results)
@@ -204,11 +206,11 @@ def statistical_tests(df_filtered, salary_growth):
         # Interpretation
         if sex_pval < 0.05:
             if sex_coef < 0:
-                st.write(f"**Interpretation**: Without controlling for other factors, women received ${abs(sex_coef):.2f} less per year in raises than men (p={sex_pval:.4f}).")
+                st.write(f"**Interpretation**: Without controlling for other factors, women received ${abs(sex_coef):.2f} less per year in raises than men (p={sex_pval}).")
             else:
-                st.write(f"**Interpretation**: Without controlling for other factors, women received ${sex_coef:.2f} more per year in raises than men (p={sex_pval:.4f}).")
+                st.write(f"**Interpretation**: Without controlling for other factors, women received ${sex_coef:.2f} more per year in raises than men (p={sex_pval}).")
         else:
-            st.write(f"**Interpretation**: Without controlling for other factors, there is no statistically significant difference in salary growth between men and women (p={sex_pval:.4f}).")
+            st.write(f"**Interpretation**: Without controlling for other factors, there is no statistically significant difference in salary growth between men and women (p={sex_pval}).")
         
         # Display key model statistics in a structured table instead of raw summary output
         model_stats = pd.DataFrame({
@@ -218,7 +220,7 @@ def statistical_tests(df_filtered, salary_growth):
                 f"{simple_results.rsquared:.4f}",
                 f"{simple_results.rsquared_adj:.4f}",
                 f"{simple_results.fvalue:.4f}",
-                f"{simple_results.f_pvalue:.4f}",
+                f"{simple_results.f_pvalue}",
                 f"{simple_results.nobs}"
             ]
         })
@@ -231,7 +233,7 @@ def statistical_tests(df_filtered, salary_growth):
             'Coefficient': [f"{simple_results.params['Intercept']:.4f}", f"{simple_results.params['sex_dummy']:.4f}"],
             'Std Error': [f"{simple_results.bse['Intercept']:.4f}", f"{simple_results.bse['sex_dummy']:.4f}"],
             'T-value': [f"{simple_results.tvalues['Intercept']:.4f}", f"{simple_results.tvalues['sex_dummy']:.4f}"],
-            'P-value': [f"{simple_results.pvalues['Intercept']:.4f}", f"{simple_results.pvalues['sex_dummy']:.4f}"],
+            'P-value': [f"{simple_results.pvalues['Intercept']}", f"{simple_results.pvalues['sex_dummy']}"],
             '95% CI Lower': [f"{simple_results.conf_int().iloc[0, 0]:.4f}", f"{simple_results.conf_int().iloc[1, 0]:.4f}"],
             '95% CI Upper': [f"{simple_results.conf_int().iloc[0, 1]:.4f}", f"{simple_results.conf_int().iloc[1, 1]:.4f}"]
         })
@@ -265,7 +267,7 @@ def statistical_tests(df_filtered, salary_growth):
         # Create a DataFrame for clean display
         model2_results = pd.DataFrame({
             'Statistic': ['Adjusted effect of being female', 'P-value', 'R-squared', 'CI Lower', 'CI Upper'],
-            'Value': [f"${sex_coef:.2f} per year", f"{sex_pval:.4f}", f"{r_squared:.4f}", f"${sex_ci_lower:.2f}", f"${sex_ci_upper:.2f}"]
+            'Value': [f"${sex_coef:.2f} per year", f"{sex_pval}", f"{r_squared:.4f}", f"${sex_ci_lower:.2f}", f"${sex_ci_upper:.2f}"]
         })
         
         st.dataframe(model2_results)
@@ -273,11 +275,11 @@ def statistical_tests(df_filtered, salary_growth):
         # Interpretation
         if abs(sex_coef) > 0 and (sex_ci_lower * sex_ci_upper > 0):
             if sex_coef < 0:
-                st.write(f"**Interpretation**: After controlling for confounders, women received ${abs(sex_coef):.2f} less per year in raises than men with similar profiles (p={sex_pval:.4f}).")
+                st.write(f"**Interpretation**: After controlling for confounders, women received ${abs(sex_coef):.2f} less per year in raises than men with similar profiles (p={sex_pval}).")
             else:
-                st.write(f"**Interpretation**: After controlling for confounders, women received ${sex_coef:.2f} more per year in raises than men with similar profiles (p={sex_pval:.4f}).")
+                st.write(f"**Interpretation**: After controlling for confounders, women received ${sex_coef:.2f} more per year in raises than men with similar profiles (p={sex_pval}).")
         else:
-            st.write(f"**Interpretation**: After controlling for confounders, there is no statistically significant evidence of sex bias in salary growth (p={sex_pval:.4f}).")
+            st.write(f"**Interpretation**: After controlling for confounders, there is no statistically significant evidence of sex bias in salary growth (p={sex_pval}).")
         
         # Display key model statistics in a structured table
         model_stats = pd.DataFrame({
@@ -287,7 +289,7 @@ def statistical_tests(df_filtered, salary_growth):
                 f"{full_results.rsquared:.4f}",
                 f"{full_results.rsquared_adj:.4f}",
                 f"{full_results.fvalue:.4f}",
-                f"{full_results.f_pvalue:.4f}",
+                f"{full_results.f_pvalue}",
                 f"{full_results.nobs}"
             ]
         })
@@ -303,7 +305,7 @@ def statistical_tests(df_filtered, salary_growth):
                 'Coefficient': f"{full_results.params[var_name]:.4f}",
                 'Std Error': f"{full_results.bse[var_name]:.4f}",
                 'T-value': f"{full_results.tvalues[var_name]:.4f}",
-                'P-value': f"{full_results.pvalues[var_name]:.4f}",
+                'P-value': f"{full_results.pvalues[var_name]}",
                 'Significant': "Yes" if full_results.pvalues[var_name] < 0.05 else "No"
             })
         
@@ -347,7 +349,7 @@ def statistical_tests(df_filtered, salary_growth):
                 interaction_data.append({
                     'Interaction': f"Female × {category}",
                     'Coefficient': f"${coef:.2f}",
-                    'P-value': f"{p_val:.4f}",
+                    'P-value': f"{p_val}",
                     'Significant': "Yes" if p_val < 0.05 else "No"
                 })
         
@@ -366,9 +368,9 @@ def statistical_tests(df_filtered, salary_growth):
                     p_val = float(inter['P-value'])
                     
                     if coef < 0:
-                        st.write(f"- Among {category}, women received ${abs(coef):.2f} less per year than would be expected from the main effects alone (p={p_val:.4f}).")
+                        st.write(f"- Among {category}, women received ${abs(coef):.2f} less per year than would be expected from the main effects alone (p={p_val}).")
                     else:
-                        st.write(f"- Among {category}, women received ${coef:.2f} more per year than would be expected from the main effects alone (p={p_val:.4f}).")
+                        st.write(f"- Among {category}, women received ${coef:.2f} more per year than would be expected from the main effects alone (p={p_val}).")
             else:
                 st.write("**No significant interactions were found** indicating variation of the sex effect across rank or field.")
         else:
@@ -382,7 +384,7 @@ def statistical_tests(df_filtered, salary_growth):
                 f"{interaction_results.rsquared:.4f}",
                 f"{interaction_results.rsquared_adj:.4f}",
                 f"{interaction_results.fvalue:.4f}",
-                f"{interaction_results.f_pvalue:.4f}",
+                f"{interaction_results.f_pvalue}",
                 f"{interaction_results.nobs}"
             ]
         })
@@ -408,7 +410,7 @@ def statistical_tests(df_filtered, salary_growth):
                     'Coefficient': f"{interaction_results.params[var_name]:.4f}",
                     'Std Error': f"{interaction_results.bse[var_name]:.4f}",
                     'T-value': f"{interaction_results.tvalues[var_name]:.4f}",
-                    'P-value': f"{interaction_results.pvalues[var_name]:.4f}",
+                    'P-value': f"{interaction_results.pvalues[var_name]}",
                     'Significant': "Yes" if interaction_results.pvalues[var_name] < 0.05 else "No"
                 })
         
@@ -455,7 +457,7 @@ def statistical_tests(df_filtered, salary_growth):
             # Create a DataFrame for clean display
             gee_results_df = pd.DataFrame({
                 'Statistic': ['GEE model effect of being female', 'P-value'],
-                'Value': [f"${gee_sex_coef:.2f}", f"{gee_sex_pval:.4f}"]
+                'Value': [f"${gee_sex_coef:.2f}", f"{gee_sex_pval}"]
             })
             
             st.dataframe(gee_results_df)
@@ -463,11 +465,11 @@ def statistical_tests(df_filtered, salary_growth):
             # Interpretation
             if gee_sex_pval < 0.05:
                 if gee_sex_coef < 0:
-                    st.write(f"**Interpretation**: Taking into account repeated measurements, women had ${abs(gee_sex_coef):.2f} lower salaries than men with similar profiles (p={gee_sex_pval:.4f}).")
+                    st.write(f"**Interpretation**: Taking into account repeated measurements, women had ${abs(gee_sex_coef):.2f} lower salaries than men with similar profiles (p={gee_sex_pval}).")
                 else:
-                    st.write(f"**Interpretation**: Taking into account repeated measurements, women had ${gee_sex_coef:.2f} higher salaries than men with similar profiles (p={gee_sex_pval:.4f}).")
+                    st.write(f"**Interpretation**: Taking into account repeated measurements, women had ${gee_sex_coef:.2f} higher salaries than men with similar profiles (p={gee_sex_pval}).")
             else:
-                st.write(f"**Interpretation**: Taking into account repeated measurements, there is no statistically significant evidence of sex bias in salaries (p={gee_sex_pval:.4f}).")
+                st.write(f"**Interpretation**: Taking into account repeated measurements, there is no statistically significant evidence of sex bias in salaries (p={gee_sex_pval}).")
             
             # Display full model results in an expander
             with st.expander("View Full GEE Model Results"):
@@ -491,8 +493,8 @@ def summary(t_stat, p_value, full_results, interaction_results, male_slopes, fem
     
     # Create a summary table
     summary_data = [
-        {'Analysis': 'Unadjusted t-test', 'Finding': f"${male_slopes.mean() - female_slopes.mean():.2f} per year difference", 'P-value': f"{p_value:.4f}", 'Significant': "Yes" if p_value < 0.05 else "No"},
-        {'Analysis': 'Adjusted Model', 'Finding': f"${-sex_coef:.2f} per year difference after controls", 'P-value': f"{full_results.pvalues['sex_dummy']:.4f}", 'Significant': "Yes" if full_results.pvalues['sex_dummy'] < 0.05 else "No"}
+        {'Analysis': 'Unadjusted t-test', 'Finding': f"${male_slopes.mean() - female_slopes.mean():.2f} per year difference", 'P-value': f"{p_value}", 'Significant': "Yes" if p_value < 0.05 else "No"},
+        {'Analysis': 'Adjusted Model', 'Finding': f"${-sex_coef:.2f} per year difference after controls", 'P-value': f"{full_results.pvalues['sex_dummy']}", 'Significant': "Yes" if full_results.pvalues['sex_dummy'] < 0.05 else "No"}
     ]
     
     # Add interaction findings if significant
@@ -511,7 +513,7 @@ def summary(t_stat, p_value, full_results, interaction_results, male_slopes, fem
             summary_data.append({
                 'Analysis': f'Interaction: {category}',
                 'Finding': finding,
-                'P-value': f"{p_val:.4f}",
+                'P-value': f"{p_val}",
                 'Significant': "Yes"
             })
             significant_interactions.append((var, coef, p_val))
@@ -526,14 +528,14 @@ def summary(t_stat, p_value, full_results, interaction_results, male_slopes, fem
     if p_value < 0.05:
         if male_slopes.mean() > female_slopes.mean():
             diff = male_slopes.mean() - female_slopes.mean()
-            st.write(f"- **Unadjusted Analysis**: There is a statistically significant difference in raw salary growth (p={p_value:.4f}).")
+            st.write(f"- **Unadjusted Analysis**: There is a statistically significant difference in raw salary growth (p={p_value}).")
             st.write(f"  * Men received an average of ${diff:.2f} more per year in raises than women.")
         else:
             diff = female_slopes.mean() - male_slopes.mean()
-            st.write(f"- **Unadjusted Analysis**: There is a statistically significant difference in raw salary growth (p={p_value:.4f}).")
+            st.write(f"- **Unadjusted Analysis**: There is a statistically significant difference in raw salary growth (p={p_value}).")
             st.write(f"  * Women received an average of ${diff:.2f} more per year in raises than men.")
     else:
-        st.write(f"- **Unadjusted Analysis**: There is no statistically significant difference in raw salary growth (p={p_value:.4f}).")
+        st.write(f"- **Unadjusted Analysis**: There is no statistically significant difference in raw salary growth (p={p_value}).")
     
     # 2. Adjusted Analysis
     if abs(sex_coef) > 0 and (sex_ci_lower * sex_ci_upper > 0):
