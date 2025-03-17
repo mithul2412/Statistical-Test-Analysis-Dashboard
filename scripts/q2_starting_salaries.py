@@ -179,34 +179,43 @@ def exploratory_analysis(df):
     
     with col4:
         # Line plot of inflation-adjusted average salaries
-        avg_inf_male = df_M.groupby('startyr')['inf_salary'].mean()
-        avg_inf_female = df_F.groupby('startyr')['inf_salary'].mean()
+        # avg_inf_male = df_M.groupby('startyr')['inf_salary'].mean()
+        # avg_inf_female = df_F.groupby('startyr')['inf_salary'].mean()
         
+        # fig4, ax4 = plt.subplots(figsize=(8, 6))
+        # ax4.plot(avg_inf_male.index, avg_inf_male.values, 
+        #          color='skyblue', linestyle='-', marker='o', label='Male')
+        # ax4.plot(avg_inf_female.index, avg_inf_female.values, 
+        #          color='lightcoral', linestyle='-', marker='o', label='Female')
+        # ax4.set_xlabel('Start Year')
+        # ax4.set_ylabel('Inflation-Adjusted Salary (1995 $)')
+        # ax4.set_title('Inflation-Adjusted Salary Trends by Start Year')
+        # ax4.legend()
+        # ax4.grid(True)
+        # st.pyplot(fig4)
         fig4, ax4 = plt.subplots(figsize=(8, 6))
-        ax4.plot(avg_inf_male.index, avg_inf_male.values, 
-                 color='skyblue', linestyle='-', marker='o', label='Male')
-        ax4.plot(avg_inf_female.index, avg_inf_female.values, 
-                 color='lightcoral', linestyle='-', marker='o', label='Female')
-        ax4.set_xlabel('Start Year')
-        ax4.set_ylabel('Inflation-Adjusted Salary (1995 $)')
-        ax4.set_title('Inflation-Adjusted Salary Trends by Start Year')
-        ax4.legend()
+        bp = ax4.boxplot([df_M['inf_salary'], df_F['inf_salary']], labels=['Male', 'Female'], patch_artist=True)
+        for box, color in zip(bp['boxes'], ['skyblue', 'lightcoral']):
+            box.set(facecolor=color, alpha=0.8)
+        ax4.set_xlabel('Sex')
+        ax4.set_ylabel('Inflation-Adjusted Starting Salary (1995 $)')
+        ax4.set_title('Distribution of Inflation-Adjusted Starting Salaries by Sex')
         ax4.grid(True)
         st.pyplot(fig4)
     
-    # Distribution of inflated salaries - make smaller and centered
-    col1, col2, col3 = st.columns([1, 2, 1])
+    # # Distribution of inflated salaries - make smaller and centered
+    # col1, col2, col3 = st.columns([1, 2, 1])
     
-    with col2:  # Center column
-        fig5, ax5 = plt.subplots(figsize=(6, 4))
-        bp = ax5.boxplot([df_M['inf_salary'], df_F['inf_salary']], labels=['Male', 'Female'], patch_artist=True)
-        for box, color in zip(bp['boxes'], ['skyblue', 'lightcoral']):
-            box.set(facecolor=color, alpha=0.8)
-        ax5.set_xlabel('Sex')
-        ax5.set_ylabel('Inflation-Adjusted Starting Salary (1995 $)')
-        ax5.set_title('Distribution of Inflation-Adjusted Starting Salaries by Sex')
-        ax5.grid(True)
-        st.pyplot(fig5)
+    # with col2:  # Center column
+    #     fig5, ax5 = plt.subplots(figsize=(6, 4))
+    #     bp = ax5.boxplot([df_M['inf_salary'], df_F['inf_salary']], labels=['Male', 'Female'], patch_artist=True)
+    #     for box, color in zip(bp['boxes'], ['skyblue', 'lightcoral']):
+    #         box.set(facecolor=color, alpha=0.8)
+    #     ax5.set_xlabel('Sex')
+    #     ax5.set_ylabel('Inflation-Adjusted Starting Salary (1995 $)')
+    #     ax5.set_title('Distribution of Inflation-Adjusted Starting Salaries by Sex')
+    #     ax5.grid(True)
+    #     st.pyplot(fig5)
 
 def statistical_tests(df):
     st.subheader("Statistical Tests")
