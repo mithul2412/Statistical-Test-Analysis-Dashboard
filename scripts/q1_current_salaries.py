@@ -684,26 +684,22 @@ def statistical_tests(df):
                     
                     # Create a comparison table
                     robust_comparison = pd.DataFrame({
-                        'Method': ['Regular OLS', 'Robust Standard Errors'],
+                        'Method': ['Robust Standard Errors'],
                         'Sex Coefficient': [
-                            f"{original_sex_coef:.2f}",
                             f"{robust_sex_coef:.2f}"
                         ],
                         'Standard Error': [
-                            f"{model_int_admin.bse['sex_binary']:.2f}",
                             f"{robust_sex_bse:.2f}"
                         ],
                         'P-value': [
-                            f"{original_sex_pval}",
                             f"{robust_sex_pval}"
                         ],
                         'Significant': [
-                            "Yes" if original_sex_pval < 0.05 else "No",
                             "Yes" if robust_sex_pval < 0.05 else "No"
                         ]
                     })
                     
-                    st.write("**Comparison of Regular and Robust Standard Errors for Sex Effect:**")
+                    st.write("**Robust Standard Errors for Sex Effect:**")
                     st.dataframe(robust_comparison)
                     
                     # Interpretation
@@ -728,26 +724,22 @@ def statistical_tests(df):
                         
                         # Create a comparison table
                         robust_comparison = pd.DataFrame({
-                            'Method': ['Regular OLS', 'Robust Standard Errors'],
+                            'Method': ['Robust Standard Errors'],
                             'Sex Coefficient': [
-                                f"{original_sex_coef:.2f}",
                                 f"{robust_sex_coef:.2f}"
                             ],
                             'Standard Error': [
-                                f"{model_int_admin.bse[idx]:.2f}",
                                 f"{robust_sex_bse:.2f}"
                             ],
                             'P-value': [
-                                f"{original_sex_pval}",
                                 f"{robust_sex_pval}"
                             ],
                             'Significant': [
-                                "Yes" if original_sex_pval < 0.05 else "No",
                                 "Yes" if robust_sex_pval < 0.05 else "No"
                             ]
                         })
                         
-                        st.write("**Comparison of Regular and Robust Standard Errors for Sex Effect:**")
+                        st.write("**Robust Standard Errors for Sex Effect:**")
                         st.dataframe(robust_comparison)
                         
                         # Interpretation
@@ -947,22 +939,22 @@ def summary(df):
                         sig_rank_diffs.append((rank, rank_props.loc[rank, 'M'], rank_props.loc[rank, 'F']))
             
             if sig_rank_diffs:
-                st.write("- **Rank Distribution**: There are notable differences in gender distribution across ranks:")
+                st.write("- **Rank Distribution**: There are notable differences in gender distribution across ranks.")
                 for rank, male_pct, female_pct in sig_rank_diffs:
                     if male_pct > female_pct:
-                        st.write(f"  * {rank} professors are {male_pct:.1f}% male and {female_pct:.1f}% female")
+                        st.write(f"  * {rank} professors are {male_pct:.1f}% male and {female_pct:.1f}% female.")
                     else:
-                        st.write(f"  * {rank} professors are {female_pct:.1f}% female and {male_pct:.1f}% male")
+                        st.write(f"  * {rank} professors are {female_pct:.1f}% female and {male_pct:.1f}% male.")
                 
                 if adj_sex_pval is not None:
                     if adj_sex_pval >= 0.05 and sex_pval < 0.05:
-                        st.write("  * These rank differences may help explain the raw salary gap between men and women")
+                        st.write("  * These rank differences may help explain the raw salary gap between men and women.")
         
         # Overall conclusion
         st.write("### Overall Conclusion")
         
         if (p_val < 0.05 or sex_pval < 0.05) and (adj_sex_pval is None or adj_sex_pval < 0.05):
-            st.write("Based on the analysis, there is evidence of sex bias in current faculty salaries, even after controlling for relevant factors.")
+            st.write("Based on the analysis, there is evidence of sex bias in recent year(1995), even after controlling for relevant factors.")
         elif (p_val < 0.05 or sex_pval < 0.05) and adj_sex_pval is not None and adj_sex_pval >= 0.05:
             st.write("Based on the analysis, the apparent sex bias in raw faculty salaries can be largely explained by other factors such as rank, field, or administrative duties rather than direct sex discrimination.")
         else:
