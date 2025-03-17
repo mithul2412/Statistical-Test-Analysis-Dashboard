@@ -47,15 +47,15 @@ def load_data(uploaded_file):
 
 def exploratory_analysis(df):
     """Perform exploratory analysis with visualizations"""
-    st.subheader("Exploratory Analysis")
+    # st.subheader("Exploratory Analysis")
     
     try:
         # PART 1: ALL TABLES FIRST
-        st.write("## Summary Tables")
+        # st.write("## Summary Tables")
         
         # Summary statistics by gender
         if 'sex' in df.columns and 'salary' in df.columns:
-            st.write("### Summary Statistics by Gender")
+            st.write("### Summary Statistics")
             
             # Group and calculate summary statistics
             summary_stats = df.groupby('sex')['salary'].agg(['mean', 'median', 'std', 'count'])
@@ -118,7 +118,7 @@ def exploratory_analysis(df):
                 st.dataframe(field_sex_prop)
             
             # PART 2: ALL VISUALIZATIONS
-            st.write("## Visualizations")
+            st.write("### Visualizations")
             
             # Create two columns for the first row of charts
             col1, col2 = st.columns(2)
@@ -240,7 +240,7 @@ def statistical_tests(df):
                 f"${female_mean:.2f}",
                 f"${mean_diff:.2f}",
                 f"{t_stat:.4f}",
-                f"{p_val:.4f}",
+                f"{p_val}",
                 "Yes" if p_val < 0.05 else "No"
             ]
         })
@@ -250,11 +250,11 @@ def statistical_tests(df):
         # Interpretation
         if p_val < 0.05:
             if mean_diff > 0:
-                st.write(f"**Interpretation**: There is a statistically significant difference in salaries. On average, men earn ${mean_diff:.2f} more than women (p={p_val:.4f}).")
+                st.write(f"**Interpretation**: There is a statistically significant difference in salaries. On average, men earn ${mean_diff:.2f} more than women (p={p_val}).")
             else:
-                st.write(f"**Interpretation**: There is a statistically significant difference in salaries. On average, women earn ${abs(mean_diff):.2f} more than men (p={p_val:.4f}).")
+                st.write(f"**Interpretation**: There is a statistically significant difference in salaries. On average, women earn ${abs(mean_diff):.2f} more than men (p={p_val}).")
         else:
-            st.write(f"**Interpretation**: There is no statistically significant difference in salaries between men and women (p={p_val:.4f}).")
+            st.write(f"**Interpretation**: There is no statistically significant difference in salaries between men and women (p={p_val}).")
                 
         # 2. Simple Linear Regression (Unadjusted)
         st.write("### Simple Linear Regression: Sex Effect on Salary (Unadjusted)")
@@ -282,7 +282,7 @@ def statistical_tests(df):
                 f"{r_squared:.4f}",
                 f"{adj_r_squared:.4f}",
                 f"{f_stat:.4f}",
-                f"{f_pval:.4f}",
+                f"{f_pval}",
                 f"{model_simple.aic:.4f}",
                 f"{model_simple.bic:.4f}",
                 f"{model_simple.nobs}"
@@ -308,8 +308,8 @@ def statistical_tests(df):
                 f"{model_simple.tvalues['sex_binary']:.4f}"
             ],
             'P-value': [
-                f"{model_simple.pvalues['const']:.4f}", 
-                f"{model_simple.pvalues['sex_binary']:.4f}"
+                f"{model_simple.pvalues['const']}", 
+                f"{model_simple.pvalues['sex_binary']}"
             ],
             'CI Lower 95%': [
                 f"{model_simple.conf_int().loc['const'][0]:.2f}",
@@ -327,11 +327,11 @@ def statistical_tests(df):
         # Interpretation
         if sex_pval < 0.05:
             if sex_coef > 0:
-                st.write(f"**Interpretation**: Sex is a significant predictor of salary. Men earn ${sex_coef:.2f} more than women on average (p={sex_pval:.4f}).")
+                st.write(f"**Interpretation**: Sex is a significant predictor of salary. Men earn ${sex_coef:.2f} more than women on average (p={sex_pval}).")
             else:
-                st.write(f"**Interpretation**: Sex is a significant predictor of salary. Women earn ${abs(sex_coef):.2f} more than men on average (p={sex_pval:.4f}).")
+                st.write(f"**Interpretation**: Sex is a significant predictor of salary. Women earn ${abs(sex_coef):.2f} more than men on average (p={sex_pval}).")
         else:
-            st.write(f"**Interpretation**: Sex is not a significant predictor of salary (p={sex_pval:.4f}).")
+            st.write(f"**Interpretation**: Sex is not a significant predictor of salary (p={sex_pval}).")
         
         # Display full model results in an expander
         with st.expander("View Full Simple Regression Results"):
@@ -401,7 +401,7 @@ def statistical_tests(df):
                     f"{model_adj.rsquared:.4f}",
                     f"{model_adj.rsquared_adj:.4f}",
                     f"{model_adj.fvalue:.4f}",
-                    f"{model_adj.f_pvalue:.4f}",
+                    f"{model_adj.f_pvalue}",
                     f"{model_adj.aic:.4f}",
                     f"{model_adj.bic:.4f}",
                     f"{model_adj.nobs}"
@@ -426,7 +426,7 @@ def statistical_tests(df):
                     'Coefficient': f"{model_adj.params[var]:.2f}",
                     'Std Error': f"{model_adj.bse[var]:.2f}",
                     't-value': f"{model_adj.tvalues[var]:.4f}",
-                    'P-value': f"{model_adj.pvalues[var]:.4f}",
+                    'P-value': f"{model_adj.pvalues[var]}",
                     'Significant': "Yes" if model_adj.pvalues[var] < 0.05 else "No"
                 })
             
@@ -450,11 +450,11 @@ def statistical_tests(df):
             # Interpretation
             if adj_sex_pval < 0.05:
                 if adj_sex_coef > 0:
-                    st.write(f"**Interpretation**: After controlling for other factors, men earn ${adj_sex_coef:.2f} more than women on average (p={adj_sex_pval:.4f}).")
+                    st.write(f"**Interpretation**: After controlling for other factors, men earn ${adj_sex_coef:.2f} more than women on average (p={adj_sex_pval}).")
                 else:
-                    st.write(f"**Interpretation**: After controlling for other factors, women earn ${abs(adj_sex_coef):.2f} more than men on average (p={adj_sex_pval:.4f}).")
+                    st.write(f"**Interpretation**: After controlling for other factors, women earn ${abs(adj_sex_coef):.2f} more than men on average (p={adj_sex_pval}).")
             else:
-                st.write(f"**Interpretation**: After controlling for other factors, there is no significant difference in salary between men and women (p={adj_sex_pval:.4f}).")
+                st.write(f"**Interpretation**: After controlling for other factors, there is no significant difference in salary between men and women (p={adj_sex_pval}).")
             
             # Display full model results in an expander
             with st.expander("View Full Multiple Regression Results"):
@@ -525,7 +525,7 @@ def statistical_tests(df):
                         'Coefficient': [f"{int_coef:.2f}"],
                         'Std Error': [f"{model_int_admin.bse['sex_admin']:.2f}"],
                         't-value': [f"{model_int_admin.tvalues['sex_admin']:.4f}"],
-                        'P-value': [f"{int_pval:.4f}"],
+                        'P-value': [f"{int_pval}"],
                         'Significant': ["Yes" if int_pval < 0.05 else "No"]
                     })
                     
@@ -534,11 +534,11 @@ def statistical_tests(df):
                     # Interpretation
                     if int_pval < 0.05:
                         if int_coef > 0:
-                            st.write(f"**Interpretation**: There is a significant interaction between sex and administrative duties. Male administrators earn ${int_coef:.2f} more than would be expected from the main effects alone (p={int_pval:.4f}).")
+                            st.write(f"**Interpretation**: There is a significant interaction between sex and administrative duties. Male administrators earn ${int_coef:.2f} more than would be expected from the main effects alone (p={int_pval}).")
                         else:
-                            st.write(f"**Interpretation**: There is a significant interaction between sex and administrative duties. Male administrators earn ${abs(int_coef):.2f} less than would be expected from the main effects alone (p={int_pval:.4f}).")
+                            st.write(f"**Interpretation**: There is a significant interaction between sex and administrative duties. Male administrators earn ${abs(int_coef):.2f} less than would be expected from the main effects alone (p={int_pval}).")
                     else:
-                        st.write(f"**Interpretation**: There is no significant interaction between sex and administrative duties (p={int_pval:.4f}).")
+                        st.write(f"**Interpretation**: There is no significant interaction between sex and administrative duties (p={int_pval}).")
                     
                     # Display full model results in an expander
                     with st.expander("View Full Admin Interaction Model Results"):
@@ -587,7 +587,7 @@ def statistical_tests(df):
                                 'Coefficient': f"{coef:.2f}",
                                 'Std Error': f"{model_int_field.bse[term]:.2f}",
                                 't-value': f"{model_int_field.tvalues[term]:.4f}",
-                                'P-value': f"{p_val:.4f}",
+                                'P-value': f"{p_val}",
                                 'Significant': "Yes" if p_val < 0.05 else "No"
                             })
                         
@@ -605,9 +605,9 @@ def statistical_tests(df):
                                 p_val = float(inter['P-value'])
                                 
                                 if coef > 0:
-                                    st.write(f"- For {field} field, men earn ${coef:.2f} more than would be expected from the main effects alone (p={p_val:.4f}).")
+                                    st.write(f"- For {field} field, men earn ${coef:.2f} more than would be expected from the main effects alone (p={p_val}).")
                                 else:
-                                    st.write(f"- For {field} field, men earn ${abs(coef):.2f} less than would be expected from the main effects alone (p={p_val:.4f}).")
+                                    st.write(f"- For {field} field, men earn ${abs(coef):.2f} less than would be expected from the main effects alone (p={p_val}).")
                         else:
                             st.write("**No significant interactions found between sex and field.**")
                         
@@ -650,7 +650,7 @@ def statistical_tests(df):
             #             rank_results.append({
             #                 'Rank': rank,
             #                 'Sex Coefficient': f"{coef:.2f}",
-            #                 'P-value': f"{p_val:.4f}",
+            #                 'P-value': f"{p_val}",
             #                 'R-squared': f"{r2:.4f}",
             #                 'Sample Size': n,
             #                 'Significant': "Yes" if p_val < 0.05 else "No"
@@ -671,9 +671,9 @@ def statistical_tests(df):
             #                 p_val = float(r['P-value'].replace(',', '.'))
                             
             #                 if coef > 0:
-            #                     st.write(f"- For {rank} professors, men earn ${coef:.2f} more than women on average (p={p_val:.4f}).")
+            #                     st.write(f"- For {rank} professors, men earn ${coef:.2f} more than women on average (p={p_val}).")
             #                 else:
-            #                     st.write(f"- For {rank} professors, women earn ${abs(coef):.2f} more than men on average (p={p_val:.4f}).")
+            #                     st.write(f"- For {rank} professors, women earn ${abs(coef):.2f} more than men on average (p={p_val}).")
             #         else:
             #             st.write("**No significant sex differences found within any rank.**")
                     
@@ -716,7 +716,7 @@ def statistical_tests(df):
             #             field_results.append({
             #                 'Field': field,
             #                 'Sex Coefficient': f"{coef:.2f}",
-            #                 'P-value': f"{p_val:.4f}",
+            #                 'P-value': f"{p_val}",
             #                 'R-squared': f"{r2:.4f}",
             #                 'Sample Size': n,
             #                 'Significant': "Yes" if p_val < 0.05 else "No"
@@ -737,9 +737,9 @@ def statistical_tests(df):
             #                 p_val = float(f['P-value'].replace(',', '.'))
                             
             #                 if coef > 0:
-            #                     st.write(f"- In the {field} field, men earn ${coef:.2f} more than women on average (p={p_val:.4f}).")
+            #                     st.write(f"- In the {field} field, men earn ${coef:.2f} more than women on average (p={p_val}).")
             #                 else:
-            #                     st.write(f"- In the {field} field, women earn ${abs(coef):.2f} more than men on average (p={p_val:.4f}).")
+            #                     st.write(f"- In the {field} field, women earn ${abs(coef):.2f} more than men on average (p={p_val}).")
             #         else:
             #             st.write("**No significant sex differences found within any field.**")
                     
@@ -785,7 +785,7 @@ def statistical_tests(df):
             #             admin_results.append({
             #                 'Admin Role': admin_label,
             #                 'Sex Coefficient': f"{coef:.2f}",
-            #                 'P-value': f"{p_val:.4f}",
+            #                 'P-value': f"{p_val}",
             #                 'R-squared': f"{r2:.4f}",
             #                 'Sample Size': n,
             #                 'Significant': "Yes" if p_val < 0.05 else "No"
@@ -806,9 +806,9 @@ def statistical_tests(df):
             #                 p_val = float(a['P-value'].replace(',', '.'))
                             
             #                 if coef > 0:
-            #                     st.write(f"- For faculty {role.lower()}, men earn ${coef:.2f} more than women on average (p={p_val:.4f}).")
+            #                     st.write(f"- For faculty {role.lower()}, men earn ${coef:.2f} more than women on average (p={p_val}).")
             #                 else:
-            #                     st.write(f"- For faculty {role.lower()}, women earn ${abs(coef):.2f} more than men on average (p={p_val:.4f}).")
+            #                     st.write(f"- For faculty {role.lower()}, women earn ${abs(coef):.2f} more than men on average (p={p_val}).")
             #         else:
             #             st.write("**No significant sex differences found within administrative roles.**")
                     
@@ -846,7 +846,7 @@ def statistical_tests(df):
                 'Statistic': ['Shapiro-Wilk Statistic', 'P-value', 'Normality Assumption'],
                 'Value': [
                     f"{stat:.4f}",
-                    f"{p_value_residuals:.4f}",
+                    f"{p_value_residuals}",
                     "Satisfied" if p_value_residuals > 0.05 else "Violated"
                 ]
             })
@@ -906,8 +906,8 @@ def statistical_tests(df):
                                 f"{robust_results.bse['sex_binary']:.2f}"
                             ],
                             'P-value': [
-                                f"{adj_sex_pval:.4f}",
-                                f"{robust_sex_pval:.4f}"
+                                f"{adj_sex_pval}",
+                                f"{robust_sex_pval}"
                             ],
                             'Significant': [
                                 "Yes" if adj_sex_pval < 0.05 else "No",
@@ -921,11 +921,11 @@ def statistical_tests(df):
                         # Interpretation
                         if robust_sex_pval < 0.05:
                             if robust_sex_coef > 0:
-                                st.write(f"**Interpretation with Robust Standard Errors**: Even after accounting for heteroskedasticity, men earn ${robust_sex_coef:.2f} more than women on average (p={robust_sex_pval:.4f}).")
+                                st.write(f"**Interpretation with Robust Standard Errors**: Even after accounting for heteroskedasticity, men earn ${robust_sex_coef:.2f} more than women on average (p={robust_sex_pval}).")
                             else:
-                                st.write(f"**Interpretation with Robust Standard Errors**: Even after accounting for heteroskedasticity, women earn ${abs(robust_sex_coef):.2f} more than men on average (p={robust_sex_pval:.4f}).")
+                                st.write(f"**Interpretation with Robust Standard Errors**: Even after accounting for heteroskedasticity, women earn ${abs(robust_sex_coef):.2f} more than men on average (p={robust_sex_pval}).")
                         else:
-                            st.write(f"**Interpretation with Robust Standard Errors**: After accounting for heteroskedasticity, there is no significant difference in salary between men and women (p={robust_sex_pval:.4f}).")
+                            st.write(f"**Interpretation with Robust Standard Errors**: After accounting for heteroskedasticity, there is no significant difference in salary between men and women (p={robust_sex_pval}).")
                     else:
                         st.warning("Sex variable not found in robust model parameters.")
                 else:
@@ -951,8 +951,8 @@ def statistical_tests(df):
                                 f"{robust_sex_bse:.2f}"
                             ],
                             'P-value': [
-                                f"{adj_sex_pval:.4f}",
-                                f"{robust_sex_pval:.4f}"
+                                f"{adj_sex_pval}",
+                                f"{robust_sex_pval}"
                             ],
                             'Significant': [
                                 "Yes" if adj_sex_pval < 0.05 else "No",
@@ -966,11 +966,11 @@ def statistical_tests(df):
                         # Interpretation
                         if robust_sex_pval < 0.05:
                             if robust_sex_coef > 0:
-                                st.write(f"**Interpretation with Robust Standard Errors**: Even after accounting for heteroskedasticity, men earn ${robust_sex_coef:.2f} more than women on average (p={robust_sex_pval:.4f}).")
+                                st.write(f"**Interpretation with Robust Standard Errors**: Even after accounting for heteroskedasticity, men earn ${robust_sex_coef:.2f} more than women on average (p={robust_sex_pval}).")
                             else:
-                                st.write(f"**Interpretation with Robust Standard Errors**: Even after accounting for heteroskedasticity, women earn ${abs(robust_sex_coef):.2f} more than men on average (p={robust_sex_pval:.4f}).")
+                                st.write(f"**Interpretation with Robust Standard Errors**: Even after accounting for heteroskedasticity, women earn ${abs(robust_sex_coef):.2f} more than men on average (p={robust_sex_pval}).")
                         else:
-                            st.write(f"**Interpretation with Robust Standard Errors**: After accounting for heteroskedasticity, there is no significant difference in salary between men and women (p={robust_sex_pval:.4f}).")
+                            st.write(f"**Interpretation with Robust Standard Errors**: After accounting for heteroskedasticity, there is no significant difference in salary between men and women (p={robust_sex_pval}).")
                     else:
                         st.warning("Sex variable not found in model parameters.")
                 
@@ -1083,13 +1083,13 @@ def summary(df):
         
         # Create summary table
         summary_data = [
-            {'Analysis': 'Raw Salary Difference', 'Finding': f"${raw_diff:.2f} {'higher for men' if raw_diff > 0 else 'higher for women'}", 'P-value': f"{p_val:.4f}", 'Significant': "Yes" if p_val < 0.05 else "No"},
-            {'Analysis': 'Simple Regression', 'Finding': f"${sex_coef:.2f} {'higher for men' if sex_coef > 0 else 'higher for women'}", 'P-value': f"{sex_pval:.4f}", 'Significant': "Yes" if sex_pval < 0.05 else "No"}
+            {'Analysis': 'Raw Salary Difference', 'Finding': f"${raw_diff:.2f} {'higher for men' if raw_diff > 0 else 'higher for women'}", 'P-value': f"{p_val}", 'Significant': "Yes" if p_val < 0.05 else "No"},
+            {'Analysis': 'Simple Regression', 'Finding': f"${sex_coef:.2f} {'higher for men' if sex_coef > 0 else 'higher for women'}", 'P-value': f"{sex_pval}", 'Significant': "Yes" if sex_pval < 0.05 else "No"}
         ]
         
         if adj_sex_coef is not None and adj_sex_pval is not None:
             summary_data.append(
-                {'Analysis': 'Multiple Regression with Controls', 'Finding': f"${adj_sex_coef:.2f} {'higher for men' if adj_sex_coef > 0 else 'higher for women'}", 'P-value': f"{adj_sex_pval:.4f}", 'Significant': "Yes" if adj_sex_pval < 0.05 else "No"}
+                {'Analysis': 'Multiple Regression with Controls', 'Finding': f"${adj_sex_coef:.2f} {'higher for men' if adj_sex_coef > 0 else 'higher for women'}", 'P-value': f"{adj_sex_pval}", 'Significant': "Yes" if adj_sex_pval < 0.05 else "No"}
             )
         
         summary_df = pd.DataFrame(summary_data)
@@ -1101,30 +1101,30 @@ def summary(df):
         # Raw difference
         if p_val < 0.05:
             if raw_diff > 0:
-                st.write(f"- **Raw Salary Difference**: Men earn ${raw_diff:.2f} more than women on average, which is statistically significant (p={p_val:.4f}).")
+                st.write(f"- **Raw Salary Difference**: Men earn ${raw_diff:.2f} more than women on average, which is statistically significant (p={p_val}).")
             else:
-                st.write(f"- **Raw Salary Difference**: Women earn ${abs(raw_diff):.2f} more than men on average, which is statistically significant (p={p_val:.4f}).")
+                st.write(f"- **Raw Salary Difference**: Women earn ${abs(raw_diff):.2f} more than men on average, which is statistically significant (p={p_val}).")
         else:
-            st.write(f"- **Raw Salary Difference**: The raw difference in salary between men (${male_mean:.2f}) and women (${female_mean:.2f}) is not statistically significant (p={p_val:.4f}).")
+            st.write(f"- **Raw Salary Difference**: The raw difference in salary between men (${male_mean:.2f}) and women (${female_mean:.2f}) is not statistically significant (p={p_val}).")
         
         # Simple regression
         if sex_pval < 0.05:
             if sex_coef > 0:
-                st.write(f"- **Simple Regression**: Sex is a significant predictor of salary. Men earn ${sex_coef:.2f} more than women on average (p={sex_pval:.4f}).")
+                st.write(f"- **Simple Regression**: Sex is a significant predictor of salary. Men earn ${sex_coef:.2f} more than women on average (p={sex_pval}).")
             else:
-                st.write(f"- **Simple Regression**: Sex is a significant predictor of salary. Women earn ${abs(sex_coef):.2f} more than men on average (p={sex_pval:.4f}).")
+                st.write(f"- **Simple Regression**: Sex is a significant predictor of salary. Women earn ${abs(sex_coef):.2f} more than men on average (p={sex_pval}).")
         else:
-            st.write(f"- **Simple Regression**: Sex is not a significant predictor of salary (p={sex_pval:.4f}).")
+            st.write(f"- **Simple Regression**: Sex is not a significant predictor of salary (p={sex_pval}).")
         
         # Multiple regression
         if adj_sex_coef is not None and adj_sex_pval is not None:
             if adj_sex_pval < 0.05:
                 if adj_sex_coef > 0:
-                    st.write(f"- **Multiple Regression**: After controlling for other factors (e.g., rank, field, degree, administrative duties), men earn ${adj_sex_coef:.2f} more than women on average (p={adj_sex_pval:.4f}).")
+                    st.write(f"- **Multiple Regression**: After controlling for other factors (e.g., rank, field, degree, administrative duties), men earn ${adj_sex_coef:.2f} more than women on average (p={adj_sex_pval}).")
                 else:
-                    st.write(f"- **Multiple Regression**: After controlling for other factors (e.g., rank, field, degree, administrative duties), women earn ${abs(adj_sex_coef):.2f} more than men on average (p={adj_sex_pval:.4f}).")
+                    st.write(f"- **Multiple Regression**: After controlling for other factors (e.g., rank, field, degree, administrative duties), women earn ${abs(adj_sex_coef):.2f} more than men on average (p={adj_sex_pval}).")
             else:
-                st.write(f"- **Multiple Regression**: After controlling for other factors, there is no significant difference in salary between men and women (p={adj_sex_pval:.4f}).")
+                st.write(f"- **Multiple Regression**: After controlling for other factors, there is no significant difference in salary between men and women (p={adj_sex_pval}).")
             
             # Compare raw vs. adjusted effect
             if (sex_pval < 0.05) != (adj_sex_pval < 0.05):
