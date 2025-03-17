@@ -341,47 +341,39 @@ def statistical_tests(df):
         st.write("### Multiple Linear Regression: Sex Effect on Salary (Adjusted)")
         
         # Check which control variables are available
-        control_vars = []
+        categorical_cols = []
         if 'rank' in df.columns:
-            control_vars.append('rank')
+            categorical_cols.append('rank')
         if 'admin' in df.columns:
-            control_vars.append('admin')
+            categorical_cols.append('admin')
         if 'deg' in df.columns:
-            control_vars.append('deg')
+            categorical_cols.append('deg')
         if 'field' in df.columns:
-            control_vars.append('field')
+            categorical_cols.append('field')
             
-        if control_vars:
+        if categorical_cols:
             # Create a copy of the data for adjusted analysis
             df_adj = df.copy()
             
-            # Convert all columns to appropriate types before dummies
-            for col in control_vars:
-                df_adj[col] = df_adj[col].astype(str)
-                
+            # Ensure sex_binary is created
+            df_adj['sex_binary'] = df_adj['sex'].map({'F': 0, 'M': 1})
+            
             # Creating dummy variables for categorical predictors
-            df_adj = pd.get_dummies(df_adj, columns=control_vars, drop_first=True)
+            df_adj = pd.get_dummies(df_adj, columns=categorical_cols, drop_first=True)
             
-            # Get list of all columns except those we want to exclude
+            # Define columns to exclude
             exclude_cols = ['salary', 'case', 'id', 'sex', 'year', 'yrdeg', 'startyr']
-            X_cols = [col for col in df_adj.columns if col not in exclude_cols and col != 'sex_binary']
             
-            # Add sex_binary to the predictors
-            X_cols.insert(0, 'sex_binary')
+            # Define independent variables (exclude unnecessary columns)
+            X_adj = df_adj.drop(columns=exclude_cols)
             
-            # Make sure all columns in X_cols are numeric
-            for col in X_cols:
-                if df_adj[col].dtype == 'object':
-                    try:
-                        df_adj[col] = pd.to_numeric(df_adj[col])
-                    except:
-                        # If conversion fails, drop the column
-                        X_cols.remove(col)
-                        st.warning(f"Dropped column {col} because it couldn't be converted to numeric")
-            
-            # Define independent variables - only include numeric columns
-            X_adj = df_adj[X_cols].select_dtypes(include=['number'])
+            # Add constant term
             X_adj = sm.add_constant(X_adj)
+            
+            # Convert boolean columns to integers if needed
+            bool_cols = X_adj.select_dtypes(include=['bool']).columns
+            if len(bool_cols) > 0:
+                X_adj[bool_cols] = X_adj[bool_cols].astype(int)
             
             # Define dependent variable
             y_adj = df_adj['salary']
@@ -392,7 +384,6 @@ def statistical_tests(df):
             # Extract key results
             adj_sex_coef = model_adj.params['sex_binary']
             adj_sex_pval = model_adj.pvalues['sex_binary']
-            adj_r_squared = model_adj.rsquared
             
             # Create a DataFrame for model statistics
             model_adj_stats = pd.DataFrame({
@@ -460,33 +451,6 @@ def statistical_tests(df):
             with st.expander("View Full Multiple Regression Results"):
                 st.text(model_adj.summary().as_text())
             
-            # # Check for multicollinearity using Variance Inflation Factors (VIF)
-            # st.write("### Multicollinearity Check (VIF)")
-            
-            # # Calculate VIF for each predictor
-            # vif_data = pd.DataFrame()
-            # vif_data["Variable"] = X_adj.columns
-            # vif_data["VIF"] = [variance_inflation_factor(X_adj.values, i) for i in range(X_adj.shape[1])]
-            
-            # # Sort by VIF value
-            # vif_data = vif_data.sort_values('VIF', ascending=False)
-            
-            # # Add interpretation column
-            # vif_data['Concern Level'] = pd.cut(
-            #     vif_data['VIF'],
-            #     bins=[0, 5, 10, float('inf')],
-            #     labels=['Low', 'Moderate', 'High']
-            # )
-            
-            # st.dataframe(vif_data)
-            
-            # st.write("""
-            # **VIF Interpretation:**
-            # - VIF < 5: Low concern of multicollinearity
-            # - 5 ≤ VIF < 10: Moderate concern of multicollinearity
-            # - VIF ≥ 10: High concern of multicollinearity
-            # """)
-            
             # 4. Interaction Effects
             st.write("### Interaction Effects")
             
@@ -494,26 +458,38 @@ def statistical_tests(df):
                 st.write("#### Interaction between Sex and Administrative Duties")
                 
                 # Creating a copy of the data for interaction analysis
-                df_int = df_adj.copy()
+                df_int_admin = df_adj.copy()
                 
-                # Adding interaction term (sex × admin)
-                admin_cols = [col for col in df_int.columns if col.startswith('admin_')]
+                # Find admin dummy variable
+                admin_cols = [col for col in df_int_admin.columns if col.startswith('admin_')]
                 
                 if admin_cols:
-                    admin_col = admin_cols[0]  # Use the first admin dummy variable
-                    df_int['sex_admin'] = df_int['sex_binary'] * df_int[admin_col]
+                    # Use the first admin dummy column
+                    admin_col = admin_cols[0]
                     
-                    # Define independent variables for the model
-                    X_cols_int = X_cols.copy()
-                    X_cols_int.append('sex_admin')
+                    # Add interaction term between sex and admin
+                    df_int_admin['sex_admin'] = df_int_admin['sex_binary'] * df_int_admin[admin_col]
                     
-                    # Define X and y, ensure all types are numeric
-                    X_int = df_int[X_cols_int].select_dtypes(include=['number'])
-                    X_int = sm.add_constant(X_int)
-                    y_int = df_int['salary']
+                    # Define variables to include in the model
+                    rank_cols = [col for col in df_int_admin.columns if col.startswith('rank_')]
+                    deg_cols = [col for col in df_int_admin.columns if col.startswith('deg_')]
+                    field_cols = [col for col in df_int_admin.columns if col.startswith('field_')]
+                    
+                    # Create list of predictors
+                    predictors = ['sex_binary', admin_col, 'sex_admin'] + rank_cols + deg_cols + field_cols
+                    
+                    # Define X and y
+                    X_int_admin = df_int_admin[predictors]
+                    X_int_admin = sm.add_constant(X_int_admin)
+                    y_int_admin = df_int_admin['salary']
+                    
+                    # Convert any boolean columns to integers
+                    bool_cols = X_int_admin.select_dtypes(include=['bool']).columns
+                    if len(bool_cols) > 0:
+                        X_int_admin[bool_cols] = X_int_admin[bool_cols].astype(int)
                     
                     # Fit interaction model
-                    model_int_admin = sm.OLS(y_int, X_int).fit()
+                    model_int_admin = sm.OLS(y_int_admin, X_int_admin).fit()
                     
                     # Extract interaction term results
                     int_coef = model_int_admin.params['sex_admin']
@@ -549,27 +525,38 @@ def statistical_tests(df):
                 st.write("#### Interaction between Sex and Field")
                 
                 # Creating a copy of the data for field interaction analysis
-                df_field = df_adj.copy()
+                df_int_field = df_adj.copy()
                 
                 # Find field dummy variables
-                field_cols = [col for col in df_field.columns if col.startswith('field_')]
+                field_cols = [col for col in df_int_field.columns if col.startswith('field_')]
                 
                 if field_cols:
                     # Add interaction terms for each field
                     for field_col in field_cols:
-                        df_field[f'sex_{field_col}'] = df_field['sex_binary'] * df_field[field_col]
+                        df_int_field[f'sex_{field_col}'] = df_int_field['sex_binary'] * df_int_field[field_col]
                     
-                    # Define independent variables including field interactions
-                    X_cols_field = X_cols.copy()
-                    X_cols_field.extend([f'sex_{col}' for col in field_cols])
+                    # Get other predictors
+                    rank_cols = [col for col in df_int_field.columns if col.startswith('rank_')]
+                    admin_cols = [col for col in df_int_field.columns if col.startswith('admin_')]
+                    deg_cols = [col for col in df_int_field.columns if col.startswith('deg_')]
                     
-                    # Define X and y, ensuring all are numeric
-                    X_field = df_field[X_cols_field].select_dtypes(include=['number'])
-                    X_field = sm.add_constant(X_field)
-                    y_field = df_field['salary']
+                    # Create list of all predictors
+                    predictors = ['sex_binary'] + field_cols
+                    interaction_terms = [f'sex_{col}' for col in field_cols]
+                    all_predictors = predictors + interaction_terms + rank_cols + admin_cols + deg_cols
+                    
+                    # Define X and y
+                    X_int_field = df_int_field[all_predictors]
+                    X_int_field = sm.add_constant(X_int_field)
+                    y_int_field = df_int_field['salary']
+                    
+                    # Convert any boolean columns to integers
+                    bool_cols = X_int_field.select_dtypes(include=['bool']).columns
+                    if len(bool_cols) > 0:
+                        X_int_field[bool_cols] = X_int_field[bool_cols].astype(int)
                     
                     # Fit field interaction model
-                    model_int_field = sm.OLS(y_field, X_field).fit()
+                    model_int_field = sm.OLS(y_int_field, X_int_field).fit()
                     
                     # Extract interaction terms
                     interaction_terms = [term for term in model_int_field.params.index if term.startswith('sex_field_')]
@@ -602,7 +589,7 @@ def statistical_tests(df):
                                 parts = inter['Interaction'].split('×')
                                 field = parts[1].strip()
                                 coef = float(inter['Coefficient'])
-                                p_val = float(inter['P-value'])
+                                p_val = float(inter['P-value'].replace(',', '.') if isinstance(inter['P-value'], str) else inter['P-value'])
                                 
                                 if coef > 0:
                                     st.write(f"- For {field} field, men earn ${coef:.2f} more than would be expected from the main effects alone (p={p_val}).")
@@ -615,347 +602,147 @@ def statistical_tests(df):
                         with st.expander("View Full Field Interaction Model Results"):
                             st.text(model_int_field.summary().as_text())
             
-            # # 6. Stratified Analysis
-            # st.write("### Stratified Analysis")
-            
-            # # Regression by rank
-            # if 'rank' in df.columns:
-            #     st.write("#### Regression Analysis by Rank")
-                
-            #     rank_models = {}
-            #     rank_results = []
-                
-            #     for rank in df['rank'].unique():
-            #         # Filter data for this rank
-            #         subset = df[df['rank'] == rank].copy()
-            #         subset['sex_binary'] = subset['sex'].map({'F': 0, 'M': 1})
-                    
-            #         # Only proceed if we have enough data for both sexes
-            #         if len(subset) > 5 and 'M' in subset['sex'].values and 'F' in subset['sex'].values:
-            #             # Fit simple model
-            #             X_rank = sm.add_constant(subset['sex_binary'])
-            #             y_rank = subset['salary']
-            #             model_rank = sm.OLS(y_rank, X_rank).fit()
-                        
-            #             # Store model
-            #             rank_models[rank] = model_rank
-                        
-            #             # Extract key results
-            #             coef = model_rank.params['sex_binary']
-            #             p_val = model_rank.pvalues['sex_binary']
-            #             r2 = model_rank.rsquared
-            #             n = len(subset)
-                        
-            #             # Store results for display
-            #             rank_results.append({
-            #                 'Rank': rank,
-            #                 'Sex Coefficient': f"{coef:.2f}",
-            #                 'P-value': f"{p_val}",
-            #                 'R-squared': f"{r2:.4f}",
-            #                 'Sample Size': n,
-            #                 'Significant': "Yes" if p_val < 0.05 else "No"
-            #             })
-                
-            #     if rank_results:
-            #         # Convert to DataFrame and display
-            #         rank_df = pd.DataFrame(rank_results)
-            #         st.dataframe(rank_df)
-                    
-            #         # Interpretation
-            #         sig_ranks = [r for r in rank_results if r['Significant'] == "Yes"]
-            #         if sig_ranks:
-            #             st.write("**Significant sex differences within ranks:**")
-            #             for r in sig_ranks:
-            #                 rank = r['Rank']
-            #                 coef = float(r['Sex Coefficient'])
-            #                 p_val = float(r['P-value'].replace(',', '.'))
-                            
-            #                 if coef > 0:
-            #                     st.write(f"- For {rank} professors, men earn ${coef:.2f} more than women on average (p={p_val}).")
-            #                 else:
-            #                     st.write(f"- For {rank} professors, women earn ${abs(coef):.2f} more than men on average (p={p_val}).")
-            #         else:
-            #             st.write("**No significant sex differences found within any rank.**")
-                    
-            #         # Display each model in expanders
-            #         for rank, model in rank_models.items():
-            #             with st.expander(f"View Full Model Results for {rank} Professors"):
-            #                 st.text(model.summary().as_text())
-            #     else:
-            #         st.warning("Not enough data to run regression by rank.")
-            
-            # # Regression by field
-            # if 'field' in df.columns:
-            #     st.write("#### Regression Analysis by Field")
-                
-            #     field_models = {}
-            #     field_results = []
-                
-            #     for field in df['field'].unique():
-            #         # Filter data for this field
-            #         subset = df[df['field'] == field].copy()
-            #         subset['sex_binary'] = subset['sex'].map({'F': 0, 'M': 1})
-                    
-            #         # Only proceed if we have enough data for both sexes
-            #         if len(subset) > 5 and 'M' in subset['sex'].values and 'F' in subset['sex'].values:
-            #             # Fit simple model
-            #             X_field = sm.add_constant(subset['sex_binary'])
-            #             y_field = subset['salary']
-            #             model_field = sm.OLS(y_field, X_field).fit()
-                        
-            #             # Store model
-            #             field_models[field] = model_field
-                        
-            #             # Extract key results
-            #             coef = model_field.params['sex_binary']
-            #             p_val = model_field.pvalues['sex_binary']
-            #             r2 = model_field.rsquared
-            #             n = len(subset)
-                        
-            #             # Store results for display
-            #             field_results.append({
-            #                 'Field': field,
-            #                 'Sex Coefficient': f"{coef:.2f}",
-            #                 'P-value': f"{p_val}",
-            #                 'R-squared': f"{r2:.4f}",
-            #                 'Sample Size': n,
-            #                 'Significant': "Yes" if p_val < 0.05 else "No"
-            #             })
-                
-            #     if field_results:
-            #         # Convert to DataFrame and display
-            #         field_df = pd.DataFrame(field_results)
-            #         st.dataframe(field_df)
-                    
-            #         # Interpretation
-            #         sig_fields = [f for f in field_results if f['Significant'] == "Yes"]
-            #         if sig_fields:
-            #             st.write("**Significant sex differences within fields:**")
-            #             for f in sig_fields:
-            #                 field = f['Field']
-            #                 coef = float(f['Sex Coefficient'])
-            #                 p_val = float(f['P-value'].replace(',', '.'))
-                            
-            #                 if coef > 0:
-            #                     st.write(f"- In the {field} field, men earn ${coef:.2f} more than women on average (p={p_val}).")
-            #                 else:
-            #                     st.write(f"- In the {field} field, women earn ${abs(coef):.2f} more than men on average (p={p_val}).")
-            #         else:
-            #             st.write("**No significant sex differences found within any field.**")
-                    
-            #         # Display each model in expanders
-            #         for field, model in field_models.items():
-            #             with st.expander(f"View Full Model Results for {field} Field"):
-            #                 st.text(model.summary().as_text())
-            #     else:
-            #         st.warning("Not enough data to run regression by field.")
-            
-            # # Regression by administrative role
-            # if 'admin' in df.columns:
-            #     st.write("#### Regression Analysis by Administrative Role")
-                
-            #     admin_models = {}
-            #     admin_results = []
-                
-            #     for admin_val in [0, 1]:
-            #         # Create label for admin role
-            #         admin_label = "With Admin Duties" if admin_val == 1 else "Without Admin Duties"
-                    
-            #         # Filter data for this admin status
-            #         subset = df[df['admin'] == admin_val].copy()
-            #         subset['sex_binary'] = subset['sex'].map({'F': 0, 'M': 1})
-                    
-            #         # Only proceed if we have enough data for both sexes
-            #         if len(subset) > 5 and 'M' in subset['sex'].values and 'F' in subset['sex'].values:
-            #             # Fit simple model
-            #             X_admin = sm.add_constant(subset['sex_binary'])
-            #             y_admin = subset['salary']
-            #             model_admin = sm.OLS(y_admin, X_admin).fit()
-                        
-            #             # Store model
-            #             admin_models[admin_label] = model_admin
-                        
-            #             # Extract key results
-            #             coef = model_admin.params['sex_binary']
-            #             p_val = model_admin.pvalues['sex_binary']
-            #             r2 = model_admin.rsquared
-            #             n = len(subset)
-                        
-            #             # Store results for display
-            #             admin_results.append({
-            #                 'Admin Role': admin_label,
-            #                 'Sex Coefficient': f"{coef:.2f}",
-            #                 'P-value': f"{p_val}",
-            #                 'R-squared': f"{r2:.4f}",
-            #                 'Sample Size': n,
-            #                 'Significant': "Yes" if p_val < 0.05 else "No"
-            #             })
-                
-            #     if admin_results:
-            #         # Convert to DataFrame and display
-            #         admin_df = pd.DataFrame(admin_results)
-            #         st.dataframe(admin_df)
-                    
-            #         # Interpretation
-            #         sig_admin = [a for a in admin_results if a['Significant'] == "Yes"]
-            #         if sig_admin:
-            #             st.write("**Significant sex differences by administrative role:**")
-            #             for a in sig_admin:
-            #                 role = a['Admin Role']
-            #                 coef = float(a['Sex Coefficient'])
-            #                 p_val = float(a['P-value'].replace(',', '.'))
-                            
-            #                 if coef > 0:
-            #                     st.write(f"- For faculty {role.lower()}, men earn ${coef:.2f} more than women on average (p={p_val}).")
-            #                 else:
-            #                     st.write(f"- For faculty {role.lower()}, women earn ${abs(coef):.2f} more than men on average (p={p_val}).")
-            #         else:
-            #             st.write("**No significant sex differences found within administrative roles.**")
-                    
-            #         # Display each model in expanders
-            #         for role, model in admin_models.items():
-            #             with st.expander(f"View Full Model Results for Faculty {role}"):
-            #                 st.text(model.summary().as_text())
-            #     else:
-            #         st.warning("Not enough data to run regression by administrative role.")
-            
-            # 7. Residual analysis
+            # 6. Residual Analysis
             st.write("### Residual Analysis")
-        
-            # Get residuals from the adjusted model
-            residuals = model_adj.resid
-            
-            # Center the plots using columns
-            col1, col2, col3 = st.columns([1, 2, 1])
-            
-            with col2:  # Center column
-                # Histogram of residuals - smaller size
-                fig_res1, ax_res1 = plt.subplots(figsize=(6, 4))
-                ax_res1.hist(residuals, bins=30, edgecolor='black')
-                ax_res1.set_title('Histogram of Residuals')
-                ax_res1.set_xlabel('Residuals')
-                ax_res1.set_ylabel('Frequency')
-                ax_res1.grid(True, linestyle='--', alpha=0.6)
-                st.pyplot(fig_res1)
-            
-            # Shapiro-Wilk normality test
-            stat, p_value_residuals = stats.shapiro(residuals)
-            
-            # Create a DataFrame for normality test results
-            normality_results = pd.DataFrame({
-                'Statistic': ['Shapiro-Wilk Statistic', 'P-value', 'Normality Assumption'],
-                'Value': [
-                    f"{stat:.4f}",
-                    f"{p_value_residuals}",
-                    "Satisfied" if p_value_residuals > 0.05 else "Violated"
-                ]
-            })
-            
-            st.write("**Shapiro-Wilk Test for Normality of Residuals:**")
-            st.dataframe(normality_results)
-            
-            # Interpretation
-            if p_value_residuals < 0.05:
-                st.write("**Interpretation**: The residuals do not follow a normal distribution (p < 0.05). This may indicate that the model assumptions are violated, potentially affecting the reliability of p-values and confidence intervals.")
-            else:
-                st.write("**Interpretation**: The residuals follow a normal distribution (p > 0.05). This suggests that the model assumptions regarding error distribution are satisfied.")
-            
-            # Q-Q plot of residuals - smaller and centered
-            col1, col2, col3 = st.columns([1, 2, 1])
-            
-            with col2:  # Center column
-                fig_res2, ax_res2 = plt.subplots(figsize=(6, 4))
-                sm.qqplot(residuals, line='45', ax=ax_res2)
-                ax_res2.set_title('Q-Q Plot of Residuals')
-                ax_res2.grid(True, linestyle='--', alpha=0.6)
-                st.pyplot(fig_res2)
-            
-            st.write("""
-            **Q-Q Plot Interpretation:**
-            - Points following the diagonal line suggest normally distributed residuals
-            - Deviations from the line indicate departures from normality
-            - S-shaped patterns may indicate skewness
-            - Heavy tails at the ends suggest excess kurtosis
-            """)
 
-            
-            # 8. Robust Standard Errors
+            # Define a function to analyze residuals
+            def analyze_residuals(residuals):
+                """
+                Analyze residuals by plotting a histogram and performing the Shapiro-Wilk normality test.
+                
+                Parameters:
+                residuals (array-like): The residuals to analyze.
+                """
+                # First column for histogram
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Histogram of residuals
+                    fig_res1, ax_res1 = plt.subplots(figsize=(6, 4))
+                    ax_res1.hist(residuals, bins=30, edgecolor='black')
+                    ax_res1.set_title('Histogram of Residuals')
+                    ax_res1.set_xlabel('Residuals')
+                    ax_res1.set_ylabel('Frequency')
+                    ax_res1.grid(True, linestyle='--', alpha=0.6)
+                    st.pyplot(fig_res1)
+                
+                with col2:
+                    # Q-Q plot of residuals
+                    fig_res2, ax_res2 = plt.subplots(figsize=(6, 4))
+                    sm.qqplot(residuals, line='45', ax=ax_res2)
+                    ax_res2.set_title('Q-Q Plot of Residuals')
+                    ax_res2.grid(True, linestyle='--', alpha=0.6)
+                    st.pyplot(fig_res2)
+                
+                # Performing the Shapiro-Wilk normality test
+                stat, p_value_residuals = stats.shapiro(residuals)
+                
+                # Create a DataFrame for normality test results
+                normality_results = pd.DataFrame({
+                    'Statistic': ['Shapiro-Wilk Statistic', 'P-value', 'Normality Assumption'],
+                    'Value': [
+                        f"{stat:.4f}",
+                        f"{p_value_residuals}",
+                        "Satisfied" if p_value_residuals > 0.05 else "Violated"
+                    ]
+                })
+                
+                st.write("**Shapiro-Wilk Test for Normality of Residuals:**")
+                st.dataframe(normality_results)
+                
+                # Interpretation
+                if p_value_residuals < 0.05:
+                    st.write("**Interpretation**: The residuals do not follow a normal distribution (p < 0.05). This may indicate that the model assumptions are violated, potentially affecting the reliability of p-values and confidence intervals.")
+                else:
+                    st.write("**Interpretation**: The residuals follow a normal distribution (p > 0.05). This suggests that the model assumptions regarding error distribution are satisfied.")
+                
+                return stat, p_value_residuals
+
+            # Get residuals from the interaction admin model instead of the adjusted model
+            residuals = model_int_admin.resid
+
+            # Analyze residuals
+            analyze_residuals(residuals)
+                        
+            # 7. Robust Standard Errors
             st.write("### Robust Standard Errors")
 
             try:
-                # Generate robust covariance results for the adjusted model
-                robust_results = model_adj.get_robustcov_results(cov_type='HC1')
+                # Generate robust covariance results for the interaction admin model instead of adjusted model
+                robust_results = model_int_admin.get_robustcov_results(cov_type='HC1')
                 
-                # Check if robust_results.params is a numpy array or a pandas Series
-                if hasattr(robust_results.params, 'index'):
-                    # It's a pandas Series with an index
-                    if 'sex_binary' in robust_results.params.index:
-                        # Extract sex coefficient and p-value with robust standard errors
-                        robust_sex_coef = robust_results.params['sex_binary']
-                        robust_sex_pval = robust_results.pvalues['sex_binary']
-                        
-                        # Create a comparison table
-                        robust_comparison = pd.DataFrame({
-                            'Method': ['Regular OLS', 'Robust Standard Errors'],
-                            'Sex Coefficient': [
-                                f"{adj_sex_coef:.2f}",
-                                f"{robust_sex_coef:.2f}"
-                            ],
-                            'Standard Error': [
-                                f"{model_adj.bse['sex_binary']:.2f}",
-                                f"{robust_results.bse['sex_binary']:.2f}"
-                            ],
-                            'P-value': [
-                                f"{adj_sex_pval}",
-                                f"{robust_sex_pval}"
-                            ],
-                            'Significant': [
-                                "Yes" if adj_sex_pval < 0.05 else "No",
-                                "Yes" if robust_sex_pval < 0.05 else "No"
-                            ]
-                        })
-                        
-                        st.write("**Comparison of Regular and Robust Standard Errors for Sex Effect:**")
-                        st.dataframe(robust_comparison)
-                        
-                        # Interpretation
-                        if robust_sex_pval < 0.05:
-                            if robust_sex_coef > 0:
-                                st.write(f"**Interpretation with Robust Standard Errors**: Even after accounting for heteroskedasticity, men earn ${robust_sex_coef:.2f} more than women on average (p={robust_sex_pval}).")
-                            else:
-                                st.write(f"**Interpretation with Robust Standard Errors**: Even after accounting for heteroskedasticity, women earn ${abs(robust_sex_coef):.2f} more than men on average (p={robust_sex_pval}).")
+                # Check if 'sex_binary' is in the parameters before accessing
+                if 'sex_binary' in robust_results.params:
+                    # Extract sex coefficient and p-value with robust standard errors
+                    robust_sex_coef = robust_results.params['sex_binary']
+                    robust_sex_pval = robust_results.pvalues['sex_binary']
+                    robust_sex_bse = robust_results.bse['sex_binary']
+                    
+                    # Get original coefficient for comparison (from interaction admin model)
+                    original_sex_coef = model_int_admin.params['sex_binary']
+                    original_sex_pval = model_int_admin.pvalues['sex_binary']
+                    
+                    # Create a comparison table
+                    robust_comparison = pd.DataFrame({
+                        'Method': ['Regular OLS', 'Robust Standard Errors'],
+                        'Sex Coefficient': [
+                            f"{original_sex_coef:.2f}",
+                            f"{robust_sex_coef:.2f}"
+                        ],
+                        'Standard Error': [
+                            f"{model_int_admin.bse['sex_binary']:.2f}",
+                            f"{robust_sex_bse:.2f}"
+                        ],
+                        'P-value': [
+                            f"{original_sex_pval}",
+                            f"{robust_sex_pval}"
+                        ],
+                        'Significant': [
+                            "Yes" if original_sex_pval < 0.05 else "No",
+                            "Yes" if robust_sex_pval < 0.05 else "No"
+                        ]
+                    })
+                    
+                    st.write("**Comparison of Regular and Robust Standard Errors for Sex Effect:**")
+                    st.dataframe(robust_comparison)
+                    
+                    # Interpretation
+                    if robust_sex_pval < 0.05:
+                        if robust_sex_coef > 0:
+                            st.write(f"**Interpretation with Robust Standard Errors**: Even after accounting for heteroskedasticity, men earn ${robust_sex_coef:.2f} more than women on average (p={robust_sex_pval}).")
                         else:
-                            st.write(f"**Interpretation with Robust Standard Errors**: After accounting for heteroskedasticity, there is no significant difference in salary between men and women (p={robust_sex_pval}).")
+                            st.write(f"**Interpretation with Robust Standard Errors**: Even after accounting for heteroskedasticity, women earn ${abs(robust_sex_coef):.2f} more than men on average (p={robust_sex_pval}).")
                     else:
-                        st.warning("Sex variable not found in robust model parameters.")
+                        st.write(f"**Interpretation with Robust Standard Errors**: After accounting for heteroskedasticity, there is no significant difference in salary between men and women (p={robust_sex_pval}).")
                 else:
-                    # It's a numpy array
-                    # Find the index of 'sex_binary' in the original model
-                    if 'sex_binary' in model_adj.params.index:
-                        sex_binary_idx = list(model_adj.params.index).index('sex_binary')
+                    # Try to handle the case where parameters are numpy arrays instead of pandas Series
+                    param_names = model_int_admin.params.index
+                    if 'sex_binary' in param_names:
+                        idx = param_names.get_loc('sex_binary')
+                        robust_sex_coef = robust_results.params[idx]
+                        robust_sex_pval = robust_results.pvalues[idx]
+                        robust_sex_bse = robust_results.bse[idx]
                         
-                        # Get the robust coefficient and p-value using the index
-                        robust_sex_coef = robust_results.params[sex_binary_idx]
-                        robust_sex_pval = robust_results.pvalues[sex_binary_idx]
-                        robust_sex_bse = robust_results.bse[sex_binary_idx]
+                        original_sex_coef = model_int_admin.params[idx]
+                        original_sex_pval = model_int_admin.pvalues[idx]
                         
                         # Create a comparison table
                         robust_comparison = pd.DataFrame({
                             'Method': ['Regular OLS', 'Robust Standard Errors'],
                             'Sex Coefficient': [
-                                f"{adj_sex_coef:.2f}",
+                                f"{original_sex_coef:.2f}",
                                 f"{robust_sex_coef:.2f}"
                             ],
                             'Standard Error': [
-                                f"{model_adj.bse['sex_binary']:.2f}",
+                                f"{model_int_admin.bse[idx]:.2f}",
                                 f"{robust_sex_bse:.2f}"
                             ],
                             'P-value': [
-                                f"{adj_sex_pval}",
+                                f"{original_sex_pval}",
                                 f"{robust_sex_pval}"
                             ],
                             'Significant': [
-                                "Yes" if adj_sex_pval < 0.05 else "No",
+                                "Yes" if original_sex_pval < 0.05 else "No",
                                 "Yes" if robust_sex_pval < 0.05 else "No"
                             ]
                         })
@@ -972,7 +759,7 @@ def statistical_tests(df):
                         else:
                             st.write(f"**Interpretation with Robust Standard Errors**: After accounting for heteroskedasticity, there is no significant difference in salary between men and women (p={robust_sex_pval}).")
                     else:
-                        st.warning("Sex variable not found in model parameters.")
+                        st.warning("Could not find 'sex_binary' parameter in the model results.")
                 
                 # Display full robust model results in an expander
                 with st.expander("View Full Robust Model Results"):
@@ -980,6 +767,7 @@ def statistical_tests(df):
             except Exception as e:
                 st.warning(f"Error calculating robust standard errors: {str(e)}")
                 st.write("Robust standard errors could not be calculated. This might be due to issues with the model or data.")
+
     except Exception as e:
         st.error(f"Error in statistical tests: {str(e)}")
         st.exception(e)
@@ -1024,50 +812,43 @@ def summary(df):
         sex_pval = simple_model.pvalues['sex_binary']
         
         # Multiple regression if control variables are available
-        control_vars = []
+        categorical_cols = []
         if 'rank' in df.columns:
-            control_vars.append('rank')
+            categorical_cols.append('rank')
         if 'admin' in df.columns:
-            control_vars.append('admin')
+            categorical_cols.append('admin')
         if 'deg' in df.columns:
-            control_vars.append('deg')
+            categorical_cols.append('deg')
         if 'field' in df.columns:
-            control_vars.append('field')
+            categorical_cols.append('field')
             
         adj_sex_coef = None
         adj_sex_pval = None
         
-        if control_vars:
+        if categorical_cols:
             try:
                 # Create a copy of data for adjusted analysis
                 df_adj = df.copy()
                 
-                # Convert all columns to appropriate types before dummies
-                for col in control_vars:
-                    df_adj[col] = df_adj[col].astype(str)
+                # Ensure sex_binary is created
+                df_adj['sex_binary'] = df_adj['sex'].map({'F': 0, 'M': 1})
                 
                 # Creating dummy variables for categorical predictors
-                df_adj = pd.get_dummies(df_adj, columns=control_vars, drop_first=True)
+                df_adj = pd.get_dummies(df_adj, columns=categorical_cols, drop_first=True)
                 
-                # Get list of all columns except those we want to exclude
+                # Define columns to exclude
                 exclude_cols = ['salary', 'case', 'id', 'sex', 'year', 'yrdeg', 'startyr']
-                X_cols = [col for col in df_adj.columns if col not in exclude_cols and col != 'sex_binary']
                 
-                # Add sex_binary to the predictors
-                X_cols.insert(0, 'sex_binary')
+                # Define independent variables (exclude unnecessary columns)
+                X_adj = df_adj.drop(columns=exclude_cols)
                 
-                # Make sure all columns in X_cols are numeric
-                for col in X_cols:
-                    if df_adj[col].dtype == 'object':
-                        try:
-                            df_adj[col] = pd.to_numeric(df_adj[col])
-                        except:
-                            # If conversion fails, drop the column
-                            X_cols.remove(col)
-                
-                # Define independent variables - only include numeric columns
-                X_adj = df_adj[X_cols].select_dtypes(include=['number'])
+                # Add constant term
                 X_adj = sm.add_constant(X_adj)
+                
+                # Convert boolean columns to integers if needed
+                bool_cols = X_adj.select_dtypes(include=['bool']).columns
+                if len(bool_cols) > 0:
+                    X_adj[bool_cols] = X_adj[bool_cols].astype(int)
                 
                 # Define dependent variable
                 y_adj = df_adj['salary']
@@ -1134,9 +915,23 @@ def summary(df):
                     st.write("- **Important Note**: A significant sex difference emerges after controlling for other factors, even though the raw difference is not significant. This suggests a potential suppression effect where other variables were masking the sex-based salary difference.")
             elif sex_pval < 0.05 and adj_sex_pval < 0.05:
                 if abs(adj_sex_coef) < abs(sex_coef):
-                    st.write(f"- **Important Note**: The sex difference remains significant but reduces from ${abs(sex_coef):.2f} to ${abs(adj_sex_coef):.2f} after controlling for other factors. This suggests that part, but not all, of the salary gap can be explained by factors other than sex.")
+                    st.write(f"- **Important Note**: The sex difference remains significant but reduces after controlling for other factors. This suggests that part, but not all, of the salary gap can be explained by factors other than sex.")
                 elif abs(adj_sex_coef) > abs(sex_coef):
-                    st.write(f"- **Important Note**: The sex difference remains significant but increases from ${abs(sex_coef):.2f} to ${abs(adj_sex_coef):.2f} after controlling for other factors. This suggests that the full extent of the sex gap is only revealed after accounting for other variables.")
+                    st.write(f"- **Important Note**: The sex difference remains significant but increases from ${abs(sex_coef):.2f}  to ${abs(adj_sex_coef):.2f} after controlling for other factors. This suggests that the full extent of the sex gap is only revealed after accounting for other variables.")
+        
+        # Interaction effects summary (if available and significant)
+        # try:
+        #     if 'model_int_admin' in locals() and 'sex_admin' in model_int_admin.params.index:
+        #         int_coef = model_int_admin.params['sex_admin']
+        #         int_pval = model_int_admin.pvalues['sex_admin']
+                
+        #         if int_pval < 0.05:
+        #             if int_coef > 0:
+        #                 st.write(f"- **Interaction Effects**: There is a significant interaction between sex and administrative duties. Male administrators earn ${int_coef:.2f} more than would be expected from the main effects alone (p={int_pval:.4f}).")
+        #             else:
+        #                 st.write(f"- **Interaction Effects**: There is a significant interaction between sex and administrative duties. Male administrators earn ${abs(int_coef):.2f} less than would be expected from the main effects alone (p={int_pval:.4f}).")
+        # except:
+        #     pass  # Don't include interaction effects if not available
         
         # Generate additional findings based on what was significant in the analysis
         if 'rank' in df.columns:
