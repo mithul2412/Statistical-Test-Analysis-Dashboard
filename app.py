@@ -93,60 +93,23 @@ try:
     def main():
         st.title("Faculty Analysis Dashboard")
         
-        # # Display module import status
-        # with st.expander("Debug Information"):
-        #     st.write("### Available Modules")
-        #     for module in modules_available:
-        #         st.success(f"Module {module} successfully imported")
-            
-        #     st.write("### Import Errors")
-        #     if import_errors:
-        #         for error in import_errors:
-        #             st.error(error)
-        #     else:
-        #         st.success("No import errors detected")
-        
         # Sidebar for navigation
         st.sidebar.title("Navigation")
         
-        # File upload - with caching using session_state
-        if 'uploaded_file' not in st.session_state:
-            st.session_state.uploaded_file = None
-            
-        uploaded_file = st.sidebar.file_uploader("Upload data file (space or tab-separated)", type=["txt", "csv"])
+        # Local file handling only - no file uploader needed
         file_path = "data/salary.txt"
-
-        if st.session_state.uploaded_file is None and os.path.exists(file_path):
-            with open(file_path, 'rb') as f:
-                from io import BytesIO
-                uploaded_file = BytesIO(f.read())
-                uploaded_file.name = os.path.basename(file_path)
-                st.session_state.uploaded_file = uploaded_file
-                
-        # Update the session state if a new file is uploaded
-        if uploaded_file is not None:
-            file_contents = uploaded_file.getvalue()
-            
-            # If a new file was uploaded, or if the session state is empty, update it
-            if st.session_state.uploaded_file is None or st.session_state.uploaded_file.getvalue() != file_contents:
-                st.session_state.uploaded_file = uploaded_file
         
-        # Use the cached file if available
-        if st.session_state.uploaded_file is not None:
-            uploaded_file = st.session_state.uploaded_file
-            
-            # Read the uploaded file
+        if os.path.exists(file_path):
             try:
-                # Reset the file pointer each time
-                uploaded_file.seek(0)
+                # Read the local file
+                df = pd.read_csv(file_path, sep='\\s+')
                 
-                if uploaded_file.name.endswith('.csv'):
-                    df = pd.read_csv(uploaded_file)
-                else:
-                    df = pd.read_csv(uploaded_file, sep='\\s+')
-                    
-                # Reset the file pointer again
-                uploaded_file.seek(0)
+                # For module compatibility, create a BytesIO object to pass to analysis modules
+                with open(file_path, 'rb') as f:
+                    file_content = f.read()
+                
+                file_buffer = io.BytesIO(file_content)
+                file_buffer.name = os.path.basename(file_path)
                 
                 # Options in sidebar - only show modules that were successfully imported
                 analysis_options = ["Data Overview"]
@@ -167,7 +130,7 @@ try:
                 elif app_mode == "Q1: Sex Bias in Recent Year" and "q1" in modules_available:
                     st.header("Question 1: Does sex bias exist at the university in the most current year available (1995)?")
                     try:
-                        q1_current_salaries.run_analysis(uploaded_file)
+                        q1_current_salaries.run_analysis(file_buffer)
                     except Exception as e:
                         st.error(f"Error running Q1 analysis: {str(e)}")
                         st.exception(e)
@@ -175,7 +138,7 @@ try:
                 elif app_mode == "Q2: Sex Bias in Starting Salaries" and "q2" in modules_available:
                     st.header("Question 2: Has sex bias existed in the starting salaries of faculty members(salaries in the year hired)?")
                     try:
-                        q2_starting_salaries.run_analysis(uploaded_file)
+                        q2_starting_salaries.run_analysis(file_buffer)
                     except Exception as e:
                         st.error(f"Error running Q2 analysis: {str(e)}")
                         st.exception(e)
@@ -183,7 +146,7 @@ try:
                 elif app_mode == "Q3: Sex Bias in Salary Increases" and "q3" in modules_available:
                     st.header("Question 3: Has sex bias existed in granting salary increases between 1990 and 1995?")
                     try:
-                        q3_salary_increases.run_analysis(uploaded_file)
+                        q3_salary_increases.run_analysis(file_buffer)
                     except Exception as e:
                         st.error(f"Error running Q3 analysis: {str(e)}")
                         st.exception(e)
@@ -191,26 +154,26 @@ try:
                 elif app_mode == "Q4: Sex Bias in Promotion Decisions" and "q4" in modules_available:
                     st.header("Question 4: Has sex bias existed in granting promotions from Associate to full Professor?")
                     try:
-                        q4_promotion_decisions.run_analysis(uploaded_file)
+                        q4_promotion_decisions.run_analysis(file_buffer)
                     except Exception as e:
                         st.error(f"Error running Q4 analysis: {str(e)}")
                         st.exception(e)
-                    
+                
             except Exception as e:
                 st.error(f"Error loading file: {str(e)}")
-                st.info("Please ensure your file is in the correct format (CSV or tab/space-separated).")
-        
+                st.exception(e)
         else:
+            st.error(f"Data file not found: {file_path}")
+            st.info("Please ensure the file exists in the data folder.")
+            
             st.header("BIOST 557A Course Project")
             st.write("""
-            This application allows you to analyze faculty data for potential gender bias in:
+            This application analyzes faculty data for potential gender bias in:
             
             1. **Recent Year** - Is there a gender gap in recent year?
             2. **Starting Salaries** - Are there differences in initial compensation?
             3. **Salary Increases** - Are raises distributed equitably over time?
             4. **Promotion Decisions** - Do promotion rates and timing differ by gender?
-            
-            To begin, upload a faculty dataset using the file uploader in the sidebar.
             """)
             
             st.info("""
@@ -228,8 +191,6 @@ try:
             - **salary**: Annual salary
             - **startyr**: Start year
             - **yrdeg**: Year degree was obtained 
-            
-            The file should be in CSV format or space/tab-separated text.
             """)
     
     if __name__ == "__main__":
