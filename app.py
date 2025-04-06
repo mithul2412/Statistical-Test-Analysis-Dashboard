@@ -113,6 +113,14 @@ try:
             st.session_state.uploaded_file = None
             
         uploaded_file = st.sidebar.file_uploader("Upload data file (space or tab-separated)", type=["txt", "csv"])
+        file_path = "data/salary.txt"
+        
+        if st.session_state.uploaded_file is None and os.path.exists(file_path):
+            with open(file_path, 'rb') as f:
+                from io import BytesIO
+                uploaded_file = BytesIO(f.read())
+                uploaded_file.name = os.path.basename(file_path)
+                st.session_state.uploaded_file = uploaded_file
         
         # Update the session state if a new file is uploaded
         if uploaded_file is not None:
